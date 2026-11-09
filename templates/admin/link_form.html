@@ -1,0 +1,28 @@
+{% extends "admin/base.html" %}
+{% from "_icons.html" import icon %}
+{% block admin %}
+<div class="page-head">
+  <a class="back-link" href="{{ url_for('admin_links') }}">{{ icon('back', 16) }} All links</a>
+  <h1>{{ 'Edit link' if item and item.id else 'Add a link' }}</h1>
+</div>
+<form class="form glass" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label class="field"><span>Where is it?</span>
+    <select class="input" name="platform">
+      {% for key, name in PLATFORMS %}<option value="{{ key }}" {% if item and item.platform == key %}selected{% endif %}>{{ name }}</option>{% endfor %}
+    </select></label>
+  <label class="field"><span>Name shown on the site *</span>
+    <input class="input" name="label" maxlength="80" required placeholder="e.g. My YouTube channel" value="{{ item.label if item else '' }}"></label>
+  <label class="field"><span>Link *</span>
+    <input class="input" name="url" maxlength="500" required inputmode="url" placeholder="https://www.youtube.com/@channel" value="{{ item.url if item else '' }}">
+    <small>Copy the full address from your browser. For email, just type the address.</small></label>
+  <label class="field"><span>Small description <em>(optional)</em></span>
+    <input class="input" name="description" maxlength="200" placeholder="e.g. New videos every week" value="{{ item.description if item else '' }}"></label>
+  <label class="field"><span>Order <em>(smaller number shows first)</em></span>
+    <input class="input" type="number" name="sort_order" value="{{ item.sort_order if item and item.sort_order is defined else '' }}"></label>
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">{{ icon('check', 18) }} Save</button>
+    <a class="btn btn-glass" href="{{ url_for('admin_links') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

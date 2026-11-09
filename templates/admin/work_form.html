@@ -1,0 +1,34 @@
+{% extends "admin/base.html" %}
+{% from "_icons.html" import icon %}
+{% block admin %}
+<div class="page-head">
+  <a class="back-link" href="{{ url_for('admin_work') }}">{{ icon('back', 16) }} All work</a>
+  <h1>{{ 'Edit work' if item and item.id else 'Add where he works' }}</h1>
+</div>
+<form class="form glass" method="post" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="field"><span>Picture or logo <em>(optional)</em></span>
+    {% if item and item.logo %}<img class="preview square" id="logoPrev" src="{{ media_url(item.logo) }}" alt="">{% else %}<img class="preview square" id="logoPrev" alt="" hidden>{% endif %}
+    <input class="input file" type="file" name="logo" accept="image/*" data-preview="logoPrev">
+    {% if item and item.logo %}<label class="check"><input type="checkbox" name="remove_logo" value="1"> Remove current picture</label>{% endif %}
+  </div>
+
+  <div class="two">
+    <label class="field"><span>Job title / role *</span><input class="input" name="role" maxlength="120" required placeholder="e.g. Video Editor" value="{{ item.role if item else '' }}"></label>
+    <label class="field"><span>Company / place *</span><input class="input" name="org" maxlength="120" required placeholder="e.g. Channel 24" value="{{ item.org if item else '' }}"></label>
+  </div>
+  <label class="field"><span>Website <em>(optional)</em></span><input class="input" name="url" maxlength="500" inputmode="url" placeholder="https://…" value="{{ item.url if item else '' }}"></label>
+  <div class="two">
+    <label class="field"><span>Started <em>(year)</em></span><input class="input" type="number" name="start_year" min="1950" max="2100" inputmode="numeric" value="{{ item.start_year if item and item.start_year else '' }}"></label>
+    <label class="field"><span>Ended <em>(empty = still working)</em></span><input class="input" type="number" name="end_year" min="1950" max="2100" inputmode="numeric" value="{{ item.end_year if item and item.end_year else '' }}"></label>
+  </div>
+  <label class="field"><span>What he does there</span><textarea class="input" name="description" rows="5" maxlength="2000">{{ item.description if item else '' }}</textarea></label>
+  <label class="field"><span>Order <em>(smaller number shows first)</em></span><input class="input" type="number" name="sort_order" value="{{ item.sort_order if item and item.sort_order is defined else '' }}"></label>
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">{{ icon('check', 18) }} Save</button>
+    <a class="btn btn-glass" href="{{ url_for('admin_work') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

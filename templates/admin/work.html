@@ -1,0 +1,28 @@
+{% extends "admin/base.html" %}
+{% from "_icons.html" import icon %}
+{% block admin %}
+<div class="page-head row">
+  <div><h1>Work</h1><p class="muted">Where he works, with a picture and a description.</p></div>
+  <a class="btn btn-primary" href="{{ url_for('admin_work_form') }}">{{ icon('plus', 18) }} Add</a>
+</div>
+
+{% if items %}
+<ul class="list">
+  {% for w in items %}
+  <li class="list-item glass">
+    <div class="li-thumb square">{% if w.logo %}<img src="{{ media_url(w.logo) }}" alt="" loading="lazy">{% else %}{{ icon('work', 24) }}{% endif %}</div>
+    <div class="li-main"><strong>{{ w.role }}</strong><span class="muted">{{ w.org }}{% if w.start_year %} · {{ w.start_year }}–{{ w.end_year or 'Present' }}{% endif %}</span></div>
+    <div class="li-actions">
+      <a class="btn btn-glass btn-sm" href="{{ url_for('admin_work_form', work_id=w.id) }}">{{ icon('edit', 16) }}<span class="hide-sm"> Edit</span></a>
+      <form method="post" action="{{ url_for('admin_work_delete', work_id=w.id) }}" data-confirm="Delete this work entry?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-danger btn-sm" type="submit" aria-label="Delete">{{ icon('trash', 16) }}</button>
+      </form>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="empty glass"><p>No work added yet.</p><a class="btn btn-primary" href="{{ url_for('admin_work_form') }}">{{ icon('plus', 18) }} Add where he works</a></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "admin/base.html" %}
+{% from "_icons.html" import icon %}
+{% block admin %}
+<div class="page-head row">
+  <div><h1>Videos &amp; posts</h1><p class="muted">Add a video link or write an article. Each one gets its own readable page.</p></div>
+  <a class="btn btn-primary" href="{{ url_for('admin_post_form') }}">{{ icon('plus', 18) }} New</a>
+</div>
+
+{% if items %}
+<ul class="list">
+  {% for p in items %}
+  {% set t = thumb_url(p) %}
+  <li class="list-item glass">
+    <div class="li-thumb">{% if t %}<img src="{{ t }}" alt="" loading="lazy">{% else %}{{ icon('doc', 26) }}{% endif %}</div>
+    <div class="li-main">
+      <strong>{{ p.title }}</strong>
+      <span class="muted">
+        {{ 'Video' if p.kind == 'video' else 'Article' }} · {{ p.created_at|dt }} · {{ p.comment_count }} comment{{ '' if p.comment_count == 1 else 's' }}
+        · <span class="status {{ 'on' if p.published else 'off' }}">{{ 'Published' if p.published else 'Draft' }}</span>
+      </span>
+    </div>
+    <div class="li-actions">
+      <a class="btn btn-glass btn-sm" href="{{ url_for('admin_post_form', post_id=p.id) }}">{{ icon('edit', 16) }}<span class="hide-sm"> Edit</span></a>
+      {% if p.comment_count %}<a class="btn btn-glass btn-sm" href="{{ url_for('admin_comments', post=p.id) }}">{{ icon('chat', 16) }}<span class="hide-sm"> Comments</span></a>{% endif %}
+      <form method="post" action="{{ url_for('admin_post_toggle', post_id=p.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-glass btn-sm" type="submit">{{ 'Hide' if p.published else 'Publish' }}</button>
+      </form>
+      <form method="post" action="{{ url_for('admin_post_delete', post_id=p.id) }}" data-confirm="Delete “{{ p.title }}” and all its comments? This cannot be undone.">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-danger btn-sm" type="submit" aria-label="Delete">{{ icon('trash', 16) }}</button>
+      </form>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="empty glass"><p>Nothing here yet.</p><a class="btn btn-primary" href="{{ url_for('admin_post_form') }}">{{ icon('plus', 18) }} Add the first video</a></div>
+{% endif %}
+{% endblock %}

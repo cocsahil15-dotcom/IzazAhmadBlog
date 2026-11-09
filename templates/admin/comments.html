@@ -1,0 +1,36 @@
+{% extends "admin/base.html" %}
+{% from "_icons.html" import icon %}
+{% block admin %}
+<div class="page-head">
+  <h1>Comments</h1>
+  <p class="muted">Delete anything that is spam or unkind.</p>
+</div>
+
+<form class="filter-bar" method="get">
+  <label class="field inline"><span class="sr">Filter by post</span>
+    <select class="input" name="post" data-autosubmit>
+      <option value="">All posts</option>
+      {% for p in posts %}<option value="{{ p.id }}" {% if p.id == post_id %}selected{% endif %}>{{ p.title|truncate(60) }}</option>{% endfor %}
+    </select></label>
+  <noscript><button class="btn btn-glass" type="submit">Filter</button></noscript>
+</form>
+
+<section class="panel glass">
+  {% if items %}
+  <ul class="comment-list admin-comments">
+    {% for c in items %}
+    <li class="comment" data-comment-id="{{ c.id }}">
+      <span class="avatar sm" style="--h: {{ c.name|hue }}"><span>{{ c.name[:1]|upper }}</span></span>
+      <div class="comment-main">
+        <div class="comment-top"><strong>{{ c.name }}</strong><time title="{{ c.created_at|dtfull }}">{{ c.created_at|ago }}</time>
+          <button type="button" class="icon-btn danger js-del-comment" data-url="{{ url_for('admin_delete_comment', comment_id=c.id) }}" aria-label="Delete comment">{{ icon('trash', 17) }}</button>
+        </div>
+        <p>{{ c.body }}</p>
+        <a class="on-post" href="{{ url_for('post_view', slug=c.slug) }}" target="_blank" rel="noopener">on “{{ c.post_title }}”</a>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="muted">No comments yet.</p>{% endif %}
+</section>
+{% endblock %}

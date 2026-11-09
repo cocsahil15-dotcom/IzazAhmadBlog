@@ -1,0 +1,37 @@
+{% extends "admin/base.html" %}
+{% from "_icons.html" import icon %}
+{% set v = form if form else profile %}
+{% block admin %}
+<div class="page-head"><h1>Profile</h1><p class="muted">This is the first thing visitors see on the home page.</p></div>
+
+<form class="form glass" method="post" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <div class="two">
+    <div class="field"><span>Profile picture</span>
+      {% if profile.avatar %}<img class="preview round" id="avPrev" src="{{ media_url(profile.avatar) }}" alt="">{% else %}<img class="preview round" id="avPrev" alt="" hidden>{% endif %}
+      <input class="input file" type="file" name="avatar" accept="image/*" data-preview="avPrev">
+      {% if profile.avatar %}<label class="check"><input type="checkbox" name="remove_avatar" value="1"> Remove picture</label>{% endif %}
+    </div>
+    <div class="field"><span>Cover picture <em>(wide banner)</em></span>
+      {% if profile.cover %}<img class="preview" id="cvPrev" src="{{ media_url(profile.cover) }}" alt="">{% else %}<img class="preview" id="cvPrev" alt="" hidden>{% endif %}
+      <input class="input file" type="file" name="cover" accept="image/*" data-preview="cvPrev">
+      {% if profile.cover %}<label class="check"><input type="checkbox" name="remove_cover" value="1"> Remove cover</label>{% endif %}
+    </div>
+  </div>
+
+  <label class="field"><span>Name</span><input class="input" name="name" maxlength="80" required value="{{ v.name }}"></label>
+  <label class="field"><span>Short headline</span><input class="input" name="headline" maxlength="160" placeholder="e.g. Video creator · Journalist" value="{{ v.headline }}"></label>
+  <label class="field"><span>About him</span><textarea class="input" name="bio" rows="7" maxlength="4000" placeholder="Write a few paragraphs. Leave a blank line between paragraphs.">{{ v.bio }}</textarea></label>
+  <div class="two">
+    <label class="field"><span>Location</span><input class="input" name="location" maxlength="80" placeholder="City, Country" value="{{ v.location }}"></label>
+    <label class="field"><span>Contact email <em>(optional)</em></span><input class="input" type="email" name="email" maxlength="120" value="{{ v.email }}"></label>
+  </div>
+  <label class="field"><span>Website name</span><input class="input" name="site_title" maxlength="80" value="{{ v.site_title }}"><small>Shown above the name and in the browser tab.</small></label>
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">{{ icon('check', 18) }} Save profile</button>
+    <a class="btn btn-glass" href="{{ url_for('admin_password') }}">{{ icon('lock', 18) }} Change password</a>
+  </div>
+</form>
+{% endblock %}

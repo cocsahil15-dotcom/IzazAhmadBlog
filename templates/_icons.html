@@ -1,0 +1,36 @@
+{% macro icon(name, size=22) -%}
+<svg class="ico" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+{%- if name == 'home' %}<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/>
+{%- elif name == 'work' %}<rect x="3" y="7" width="18" height="13" rx="3"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"/><path d="M3 12.5h18"/>
+{%- elif name == 'play' or name == 'youtube' %}<rect x="3" y="5" width="18" height="14" rx="4.5"/><path d="m10.5 9.5 4 2.5-4 2.5z" fill="currentColor"/>
+{%- elif name == 'play-solid' %}<path d="m8 5.5 11 6.5-11 6.5z" fill="currentColor" stroke="none"/>
+{%- elif name == 'link' or name == 'other' %}<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>
+{%- elif name == 'facebook' %}<path d="M14.5 21v-8h2.7l.5-3.3h-3.2V7.6c0-.9.4-1.6 1.7-1.6h1.6V3.2A19 19 0 0 0 15.4 3c-2.5 0-4.2 1.5-4.2 4.3v2.4H8.5V13h2.7v8"/>
+{%- elif name == 'instagram' %}<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="3.8"/><circle cx="17" cy="7" r=".6" fill="currentColor"/>
+{%- elif name == 'tiktok' %}<path d="M14 4v10.2a3.7 3.7 0 1 1-3.7-3.7"/><path d="M14 4c.4 2.5 2 4 4.5 4.2"/>
+{%- elif name == 'x' %}<path d="M5 4.5 19 19.5M19 4.5 5 19.5"/>
+{%- elif name == 'linkedin' %}<rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><path d="M8.2 10.5V16M8.2 7.8v.1M12 16v-5.5m0 2.5a2.6 2.6 0 0 1 5.2 0v3"/>
+{%- elif name == 'whatsapp' %}<path d="M4 20l1.3-4.3A8 8 0 1 1 8.5 18.8z"/><path d="M9.2 9.2c.4 2 2.1 3.8 4.4 4.6l1-1.2 2 .9"/>
+{%- elif name == 'email' %}<rect x="3" y="5.5" width="18" height="13" rx="3"/><path d="m4 8 8 5.5L20 8"/>
+{%- elif name == 'website' %}<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 2.7 3.9 5.7 3.9 9s-1.300 6.300-3.900 9c-2.600-2.700-3.900-5.700-3.900-9S9.400 5.700 12 3z"/>
+{%- elif name == 'chevron' %}<path d="m9 6 6 6-6 6"/>
+{%- elif name == 'external' %}<path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M18 14v4.5A1.500 1.500 0 0 1 16.500 20h-11A1.500 1.500 0 0 1 4 18.500v-11A1.500 1.500 0 0 1 5.500 6H10"/>
+{%- elif name == 'chat' %}<path d="M4 6.500A2.500 2.500 0 0 1 6.500 4h11A2.500 2.500 0 0 1 20 6.500v7a2.500 2.500 0 0 1-2.500 2.500H10l-4.500 4v-4A2.500 2.500 0 0 1 4 13.500z"/>
+{%- elif name == 'search' %}<circle cx="11" cy="11" r="6.500"/><path d="m16 16 4 4"/>
+{%- elif name == 'trash' %}<path d="M4 7h16"/><path d="M9 7V4.500h6V7"/><path d="M6.500 7l.8 12.500h9.400L17.500 7"/>
+{%- elif name == 'edit' %}<path d="M4 20h4L19 9a2.800 2.800 0 0 0-4-4L4 16z"/>
+{%- elif name == 'plus' %}<path d="M12 5v14M5 12h14"/>
+{%- elif name == 'share' %}<path d="M12 15V4"/><path d="m8 8 4-4 4 4"/><path d="M5 12v6.500A1.500 1.500 0 0 0 6.500 20h11a1.500 1.500 0 0 0 1.500-1.500V12"/>
+{%- elif name == 'doc' %}<path d="M7 3.500h7l4 4V19a1.500 1.500 0 0 1-1.500 1.500h-9.500A1.500 1.500 0 0 1 5.500 19V5A1.500 1.500 0 0 1 7 3.500z"/><path d="M14 3.500V8h4"/><path d="M8.500 12.500h7M8.500 16h5"/>
+{%- elif name == 'grid' %}<rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/>
+{%- elif name == 'user' %}<circle cx="12" cy="8.500" r="3.800"/><path d="M4.500 20a7.500 7.500 0 0 1 15 0"/>
+{%- elif name == 'pin' %}<path d="M12 21s6.500-5.800 6.500-11A6.500 6.500 0 0 0 5.500 10C5.500 15.200 12 21 12 21z"/><circle cx="12" cy="10" r="2.300"/>
+{%- elif name == 'eye' %}<path d="M2.500 12S6 5.500 12 5.500 21.500 12 21.500 12 18 18.500 12 18.500 2.500 12 2.500 12z"/><circle cx="12" cy="12" r="3"/>
+{%- elif name == 'logout' %}<path d="M10 4.500H6.500A1.500 1.500 0 0 0 5 6v12a1.500 1.500 0 0 0 1.500 1.500H10"/><path d="M15 8l4 4-4 4M19 12H9.500"/>
+{%- elif name == 'lock' %}<rect x="5" y="10.500" width="14" height="9.500" rx="3"/><path d="M8.500 10.500V8a3.500 3.500 0 0 1 7 0v2.500"/>
+{%- elif name == 'back' %}<path d="m15 6-6 6 6 6"/>
+{%- elif name == 'close' %}<path d="M6 6l12 12M18 6 6 18"/>
+{%- elif name == 'check' %}<path d="m5 12.500 4.500 4.500L19 7.500"/>
+{%- endif -%}
+</svg>
+{%- endmacro %}

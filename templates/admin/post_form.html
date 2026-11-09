@@ -1,0 +1,48 @@
+{% extends "admin/base.html" %}
+{% from "_icons.html" import icon %}
+{% block admin %}
+<div class="page-head">
+  <a class="back-link" href="{{ url_for('admin_posts') }}">{{ icon('back', 16) }} All posts</a>
+  <h1>{{ 'Edit' if item and item.id else 'New video / post' }}</h1>
+</div>
+
+<form class="form glass" method="post" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <label class="field"><span>Title *</span>
+    <input class="input" name="title" maxlength="140" required value="{{ item.title if item else '' }}"></label>
+
+  <label class="field"><span>Video link <em>(optional)</em></span>
+    <input class="input" type="url" name="video_url" maxlength="500" inputmode="url" placeholder="https://www.youtube.com/watch?v=…"
+           value="{{ item.video_url if item else '' }}">
+    <small>YouTube or Facebook link. Leave empty to publish a written article instead.</small></label>
+
+  <div class="field"><span>Cover picture <em>(optional)</em></span>
+    {% if item and item.thumb %}<img class="preview" id="thumbPrev" src="{{ media_url(item.thumb) }}" alt="">{% else %}<img class="preview" id="thumbPrev" alt="" hidden>{% endif %}
+    <input class="input file" type="file" name="thumb" accept="image/*" data-preview="thumbPrev">
+    <small>YouTube videos use their own thumbnail automatically if you leave this empty.</small>
+    {% if item and item.thumb %}<label class="check"><input type="checkbox" name="remove_thumb" value="1"> Remove current picture</label>{% endif %}
+  </div>
+
+  <label class="field"><span>Short summary</span>
+    <textarea class="input" name="summary" rows="2" maxlength="400" placeholder="One or two sentences shown on the card.">{{ item.summary if item else '' }}</textarea></label>
+
+  <label class="field"><span>Key points <em>(one per line)</em></span>
+    <textarea class="input" name="key_points" rows="4" placeholder="The main idea&#10;An important step&#10;The result">{{ item.key_points if item else '' }}</textarea>
+    <small>Great for people in a hurry — shown as a checklist.</small></label>
+
+  <label class="field"><span>Full explanation</span>
+    <textarea class="input" name="description" rows="10" maxlength="20000" placeholder="Explain what the video is about, so people can read it instead of watching. Leave a blank line between paragraphs.">{{ item.description if item else '' }}</textarea></label>
+
+  <label class="field"><span>Topics <em>(comma separated)</em></span>
+    <input class="input" name="tags" maxlength="200" placeholder="health, travel, news" value="{{ item.tags if item else '' }}"></label>
+
+  <label class="check big"><input type="checkbox" name="published" value="1" {% if not item or item.published %}checked{% endif %}>
+    <span><strong>Published</strong><small>Untick to keep it as a private draft.</small></span></label>
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">{{ icon('check', 18) }} Save</button>
+    <a class="btn btn-glass" href="{{ url_for('admin_posts') }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

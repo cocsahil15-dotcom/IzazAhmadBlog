@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Admin · {{ profile.site_title }}{% endblock %}
+{% block meta %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block bodyclass %}admin{% endblock %}
+
+{% block chrome %}
+{% set nav = [
+  ('admin_dashboard', 'Dashboard', 'grid', 'admin_dashboard'),
+  ('admin_posts', 'Videos & posts', 'play', 'admin_post'),
+  ('admin_comments', 'Comments', 'chat', 'admin_comment'),
+  ('admin_work', 'Work', 'work', 'admin_work'),
+  ('admin_links', 'Links', 'link', 'admin_link'),
+  ('admin_profile', 'Profile', 'user', 'admin_profile')
+] %}
+<header class="adminbar glass">
+  <div class="adminbar-row">
+    <a class="brand" href="{{ url_for('admin_dashboard') }}"><span class="brand-badge">{{ icon('lock', 16) }}</span><span class="brand-name">Admin</span></a>
+    <div class="adminbar-actions">
+      <a class="btn btn-glass btn-sm" href="{{ url_for('index') }}" target="_blank" rel="noopener">{{ icon('eye', 16) }}<span class="hide-sm"> View site</span></a>
+      <form method="post" action="{{ url_for('admin_logout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-glass btn-sm" type="submit">{{ icon('logout', 16) }}<span class="hide-sm"> Log out</span></button>
+      </form>
+    </div>
+  </div>
+  <nav class="admin-nav" aria-label="Admin sections">
+    {% for ep, label, ic, prefix in nav %}
+    <a href="{{ url_for(ep) }}" {% if request.endpoint and request.endpoint.startswith(prefix) %}aria-current="page"{% endif %}>{{ icon(ic, 18) }}<span>{{ label }}</span></a>
+    {% endfor %}
+  </nav>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="container admin-wrap">
+  {% block admin %}{% endblock %}
+</div>
+{% endblock %}

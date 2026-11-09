@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Admin login · {{ profile.site_title }}{% endblock %}
+{% block meta %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+{% block bodyclass %}admin login-page{% endblock %}
+{% block chrome %}{% endblock %}
+
+{% block content %}
+<div class="login-wrap">
+  <form class="login-card glass" method="post" autocomplete="on">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+    <div class="login-ico">{{ icon('lock', 28) }}</div>
+    <h1>Admin login</h1>
+    <p class="muted">Sign in to manage your site.</p>
+    <label class="field"><span>Username</span>
+      <input class="input" name="username" autocomplete="username" autocapitalize="none" required autofocus></label>
+    <label class="field"><span>Password</span>
+      <input class="input" type="password" name="password" autocomplete="current-password" required></label>
+    <button class="btn btn-primary btn-block" type="submit">Sign in</button>
+    <a class="back-link center" href="{{ url_for('index') }}">{{ icon('back', 16) }} Back to site</a>
+  </form>
+</div>
+{% endblock %}

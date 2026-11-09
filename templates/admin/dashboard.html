@@ -1,0 +1,38 @@
+{% extends "admin/base.html" %}
+{% from "_icons.html" import icon %}
+{% block admin %}
+<div class="page-head"><h1>Dashboard</h1><p class="muted">Everything on your site is managed from here.</p></div>
+
+<div class="stat-grid">
+  <a class="stat glass" href="{{ url_for('admin_posts') }}"><span class="stat-n">{{ stats.posts }}</span><span>Videos &amp; posts</span></a>
+  <a class="stat glass" href="{{ url_for('admin_comments') }}"><span class="stat-n">{{ stats.comments }}</span><span>Comments</span></a>
+  <a class="stat glass" href="{{ url_for('admin_work') }}"><span class="stat-n">{{ stats.work }}</span><span>Work places</span></a>
+  <a class="stat glass" href="{{ url_for('admin_links') }}"><span class="stat-n">{{ stats.links }}</span><span>Links</span></a>
+</div>
+
+<div class="quick">
+  <a class="btn btn-primary" href="{{ url_for('admin_post_form') }}">{{ icon('plus', 18) }} New video / post</a>
+  <a class="btn btn-glass" href="{{ url_for('admin_profile') }}">{{ icon('user', 18) }} Edit profile</a>
+  <a class="btn btn-glass" href="{{ url_for('admin_password') }}">{{ icon('lock', 18) }} Change password</a>
+</div>
+
+<section class="panel glass">
+  <div class="panel-head"><h2>Latest comments</h2><a class="link" href="{{ url_for('admin_comments') }}">See all</a></div>
+  {% if latest %}
+  <ul class="comment-list admin-comments">
+    {% for c in latest %}
+    <li class="comment" data-comment-id="{{ c.id }}">
+      <span class="avatar sm" style="--h: {{ c.name|hue }}"><span>{{ c.name[:1]|upper }}</span></span>
+      <div class="comment-main">
+        <div class="comment-top"><strong>{{ c.name }}</strong><time>{{ c.created_at|ago }}</time>
+          <button type="button" class="icon-btn danger js-del-comment" data-url="{{ url_for('admin_delete_comment', comment_id=c.id) }}" aria-label="Delete comment">{{ icon('trash', 17) }}</button>
+        </div>
+        <p>{{ c.body }}</p>
+        <a class="on-post" href="{{ url_for('post_view', slug=c.slug) }}" target="_blank" rel="noopener">on “{{ c.post_title }}”</a>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="muted">No comments yet.</p>{% endif %}
+</section>
+{% endblock %}

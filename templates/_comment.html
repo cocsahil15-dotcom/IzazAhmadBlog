@@ -1,0 +1,15 @@
+<li class="comment" data-comment-id="{{ c.id }}">
+  <span class="avatar sm" style="--h: {{ c.name|hue }}"><span>{{ c.name[:1]|upper }}</span></span>
+  <div class="comment-main">
+    <div class="comment-top">
+      <strong>{{ c.name }}</strong>
+      <time>{{ c.created_at|ago }}</time>
+      {% if is_admin() %}
+      <button type="button" class="icon-btn danger js-del-comment" data-url="{{ url_for('admin_delete_comment', comment_id=c.id) }}" aria-label="Delete comment">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6.5 7l.8 12.5h9.4L17.5 7"/></svg>
+      </button>
+      {% endif %}
+    </div>
+    <p>{{ c.body }}</p>
+  </div>
+</li>

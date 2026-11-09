@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ post.title }} · {{ profile.name }}{% endblock %}
+{% block meta %}
+{% set t = thumb_url(post) %}
+<meta name="description" content="{{ (post.summary or post.description or post.title)|truncate(155) }}">
+<meta property="og:type" content="article">
+<meta property="og:title" content="{{ post.title }}">
+<meta property="og:description" content="{{ (post.summary or post.description or '')|truncate(200) }}">
+{% if t %}<meta property="og:image" content="{{ t if t.startswith('http') else request.host_url.rstrip('/') ~ t }}">{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container narrow">
+  <a class="back-link" href="{{ url_for('index') }}#videos">{{ icon('back', 18) }} All videos &amp; articles</a>
+  <div class="post-page glass">
+    {% if not post.published %}<p class="draft-note">Draft — only you can see this.</p>{% endif %}
+    {% include "_post_body.html" %}
+  </div>
+</div>
+{% endblock %}
+
+{% block footer %}
+<footer class="footer"><p>© {{ year }} {{ profile.name }}</p></footer>
+{% endblock %}

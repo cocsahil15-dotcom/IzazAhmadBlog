@@ -1,0 +1,28 @@
+{% extends "admin/base.html" %}
+{% from "_icons.html" import icon %}
+{% block admin %}
+<div class="page-head row">
+  <div><h1>Links</h1><p class="muted">YouTube, Facebook and anywhere else people can follow him.</p></div>
+  <a class="btn btn-primary" href="{{ url_for('admin_link_form') }}">{{ icon('plus', 18) }} Add</a>
+</div>
+
+{% if links %}
+<ul class="list">
+  {% for l in links %}
+  <li class="list-item glass">
+    <div class="pass-ico small" data-p="{{ l.platform }}">{{ icon(l.platform, 22) }}</div>
+    <div class="li-main"><strong>{{ l.label }}</strong><span class="muted url">{{ l.url }}</span></div>
+    <div class="li-actions">
+      <a class="btn btn-glass btn-sm" href="{{ url_for('admin_link_form', link_id=l.id) }}">{{ icon('edit', 16) }}<span class="hide-sm"> Edit</span></a>
+      <form method="post" action="{{ url_for('admin_link_delete', link_id=l.id) }}" data-confirm="Delete this link?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-danger btn-sm" type="submit" aria-label="Delete">{{ icon('trash', 16) }}</button>
+      </form>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="empty glass"><p>No links yet.</p><a class="btn btn-primary" href="{{ url_for('admin_link_form') }}">{{ icon('plus', 18) }} Add his YouTube</a></div>
+{% endif %}
+{% endblock %}

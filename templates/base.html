@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#02207a">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%230a84ff'/%3E%3Cstop offset='1' stop-color='%23bf5af2'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3C/svg%3E">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}{{ profile.name }} · {{ profile.site_title }}{% endblock %}</title>
+  {% block meta %}<meta name="description" content="{{ (profile.headline or profile.bio or profile.site_title)|truncate(155) }}">{% endblock %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=asset_v) }}">
+  <script src="{{ url_for('static', filename='js/main.js', v=asset_v) }}" defer></script>
+</head>
+<body class="{% block bodyclass %}{% endblock %}">
+{% from "_icons.html" import icon %}
+<div class="bg" aria-hidden="true"><i class="orb o1"></i><i class="orb o2"></i><i class="orb o3"></i><i class="orb o4"></i></div>
+
+{% block chrome %}
+<header class="topbar glass">
+  <a class="brand" href="{{ url_for('index') }}" aria-label="Home">
+    <span class="avatar sm">{% if profile.avatar %}<img src="{{ media_url(profile.avatar) }}" alt="">{% else %}<span>{{ profile.name[:1]|upper }}</span>{% endif %}</span>
+    <span class="brand-name">{{ profile.name }}</span>
+  </a>
+  <nav class="topnav" aria-label="Sections">
+    <a href="{{ url_for('index') }}#work">Work</a>
+    <a href="{{ url_for('index') }}#videos">Videos</a>
+    <a href="{{ url_for('index') }}#links">Connect</a>
+    {% if is_admin() %}<a class="pill-admin" href="{{ url_for('admin_dashboard') }}">Admin</a>{% endif %}
+  </nav>
+</header>
+{% endblock %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="flashes" role="status" aria-live="polite">
+    {% for cat, msg in messages %}<div class="flash flash-{{ cat }}">{{ msg }}</div>{% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}
+
+<main id="main">{% block content %}{% endblock %}</main>
+
+{% block footer %}{% endblock %}
+{% block tabbar %}{% endblock %}
+{% block sheet %}{% endblock %}
+</body>
+</html>
