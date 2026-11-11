@@ -149,6 +149,151 @@
     });
   }
 
+
+  /* ---- admin: easy video upload (drag & drop, auto cover, progress bar) ---- */
+  const vf = $('#videoFile');
+  if (vf) {
+    const form = vf.closest('form');
+    const drop = $('#videoDrop');
+    const nameEl = $('#videoName');
+    const msg = $('#formMsg');
+    const thumbIn = $('input[name=thumb]', form);
+    const thumbPrev = $('#thumbPrev');
+    const maxMb = Number(form.dataset.maxMb) || 1024;
+    const mb = n => (n / 1048576).toFixed(n > 10485760 ? 0 : 1) + ' MB';
+    const say = (t, cls) => { if (msg) { msg.className = 'form-msg ' + (cls || ''); msg.textContent = t; } };
+
+    const grabFrame = file => new Promise(resolve => {
+      const v = document.createElement('video');
+      const url = URL.createObjectURL(file);
+      const done = b => { URL.revokeObjectURL(url); resolve(b); };
+      v.muted = true; v.playsInline = true; v.preload = 'metadata'; v.src = url;
+      v.onerror = () => done(null);
+      v.onloadedmetadata = () => { v.currentTime = Math.min(1, (v.duration || 2) / 4); };
+      v.onseeked = () => {
+        try {
+          if (!v.videoWidth) return done(null);
+          const c = document.createElement('canvas');
+          c.width = Math.min(1280, v.videoWidth);
+          c.height = Math.round(c.width * v.videoHeight / v.videoWidth);
+          c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+          c.toBlob(done, 'image/jpeg', .82);
+        } catch (_) { done(null); }
+      };
+      setTimeout(() => done(null), 8000);
+    });
+
+    const picked = async () => {
+      const file = vf.files && vf.files[0];
+      if (!file) { nameEl.textContent = 'Tap to choose a video, or drop it here'; return; }
+      if (file.size > maxMb * 1048576) {
+        window.alert('This video is ' + mb(file.size) + '. The limit is ' + maxMb + ' MB.');
+        vf.value = ''; picked(); return;
+      }
+      nameEl.textContent = file.name + ' · ' + mb(file.size);
+      if (thumbIn && thumbPrev && thumbPrev.hidden && !(thumbIn.files && thumbIn.files.length)) {
+        const blob = await grabFrame(file);
+        if (blob && !(thumbIn.files && thumbIn.files.length)) {
+          const dt = new DataTransfer();
+          dt.items.add(new File([blob], 'cover.jpg', { type: 'image/jpeg' }));
+          thumbIn.files = dt.files;
+          thumbPrev.src = URL.createObjectURL(blob); thumbPrev.hidden = false;
+        }
+      }
+    };
+    vf.addEventListener('change', picked);
+    ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+    drop.addEventListener('drop', e => {
+      if (e.dataTransfer && e.dataTransfer.files.length) { vf.files = e.dataTransfer.files; picked(); }
+    });
+    if (location.hash === '#video-upload') drop.scrollIntoView({ block: 'center' });
+
+    form.addEventListener('submit', e => {
+      if (!(vf.files && vf.files[0])) return;          // no video: normal save
+      e.preventDefault();
+      const btn = $('button[type=submit]', form);
+      const bar = $('#uploadProgress'); const fill = $('i', bar); const label = $('span', bar);
+      const fail = t => { btn.disabled = false; bar.hidden = true; say(t, 'err'); };
+      btn.disabled = true; bar.hidden = false; say('Please keep this page open until the upload finishes.');
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', form.action || location.href);
+      xhr.setRequestHeader('X-Requested-With', 'fetch');
+      xhr.upload.onprogress = ev => {
+        if (!ev.lengthComputable) return;
+        const pct = Math.round(ev.loaded / ev.total * 100);
+        fill.style.width = pct + '%';
+        label.textContent = pct < 100 ? 'Uploading… ' + pct + '%' : 'Saving…';
+      };
+      xhr.onload = () => {
+        let d = {}; try { d = JSON.parse(xhr.responseText); } catch (_) {}
+        if (xhr.status < 400 && d.ok) { location.href = d.redirect || location.href; }
+        else fail(d.error || 'The upload did not work (error ' + xhr.status + '). Please try again.');
+      };
+      xhr.onerror = () => fail('The connection was lost. Please check your internet and try again.');
+      xhr.send(new FormData(form));
+    });
+  }
+
+  /* ---- Shadhin, the welcome bot ---- */
+  const bot = $('#shadhin');
+  if (bot) {
+    const panel = $('#shPanel'), fab = $('#shFab'), teaser = $('#shTeaser'), log = $('#shLog');
+    const lines = $$('#shMsgs li').map(li => li.textContent.trim()).filter(Boolean);
+    const store = { get: k => { try { return sessionStorage.getItem(k); } catch (_) { return null; } },
+                    set: (k, v) => { try { sessionStorage.setItem(k, v); } catch (_) {} } };
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    let played = false, open = false;
+
+    const bubble = (text, who) => {
+      const d = document.createElement('div');
+      d.className = 'sh-msg ' + who; d.textContent = text;
+      log.appendChild(d); log.scrollTop = log.scrollHeight; return d;
+    };
+    const play = async () => {
+      if (played || !lines.length) return;
+      played = true;
+      for (const t of lines) {
+        const dots = document.createElement('div');
+        dots.className = 'sh-msg bot sh-typing'; dots.innerHTML = '<i></i><i></i><i></i>';
+        log.appendChild(dots); log.scrollTop = log.scrollHeight;
+        await wait(650 + Math.min(900, t.length * 12));
+        dots.remove(); bubble(t, 'bot');
+        await wait(250);
+      }
+    };
+    const setOpen = v => {
+      open = v;
+      panel.classList.toggle('open', v);
+      panel.setAttribute('aria-hidden', v ? 'false' : 'true');
+      fab.setAttribute('aria-expanded', v ? 'true' : 'false');
+      teaser.hidden = true; fab.classList.remove('wiggle');
+      if (v) { store.set('shadhin-seen', '1'); play(); }
+    };
+    fab.addEventListener('click', () => setOpen(!open));
+    teaser.addEventListener('click', () => setOpen(true));
+    bot.addEventListener('click', e => { if (e.target.closest('[data-sh-close]')) setOpen(false); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && open) setOpen(false); });
+
+    $$('.sh-chip', bot).forEach(ch => ch.addEventListener('click', async e => {
+      e.preventDefault();
+      bubble(ch.textContent.trim(), 'me');
+      await wait(350); bubble(ch.dataset.reply || 'Here you go 👇', 'bot');
+      await wait(700); setOpen(false);
+      const target = document.querySelector(ch.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth' });
+    }));
+
+    /* pop up with the greeting once per visit */
+    if (lines.length && !store.get('shadhin-seen')) {
+      setTimeout(() => {
+        if (open) return;
+        teaser.textContent = lines[0]; teaser.hidden = false; fab.classList.add('wiggle');
+        setTimeout(() => { teaser.hidden = true; }, 10000);
+      }, 1500);
+    }
+  }
+
   /* ---- inside a post (sheet or full page) ---- */
   document.addEventListener('click', async e => {
     /* play the video in place */
