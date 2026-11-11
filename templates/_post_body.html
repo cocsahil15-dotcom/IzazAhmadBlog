@@ -7,7 +7,7 @@
   <div class="post-media" {% if embed %}data-embed="{{ embed }}"{% endif %}>
     {% if vsrc %}<video controls playsinline preload="metadata" {% if t %}poster="{{ t }}"{% endif %} src="{{ vsrc }}"></video>
     {% else %}
-    {% if t %}<img src="{{ t }}" alt="">{% else %}<div class="thumb-fallback">{{ icon('doc', 44) }}</div>{% endif %}
+    {% if t %}<img src="{{ t }}" alt="" decoding="async">{% else %}<div class="thumb-fallback">{{ icon('doc', 44) }}</div>{% endif %}
     {% endif %}
     {% if embed %}<button type="button" class="play-btn js-watch" aria-label="Play video here">{{ icon('play-solid', 30) }}</button>{% endif %}
   </div>

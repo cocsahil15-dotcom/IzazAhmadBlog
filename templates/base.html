@@ -14,17 +14,17 @@
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
 {% from "_icons.html" import icon %}
-<div class="bg" aria-hidden="true"><i class="orb o1"></i><i class="orb o2"></i><i class="orb o3"></i><i class="orb o4"></i></div>
+<div class="bg" aria-hidden="true"></div>
 
 {% block chrome %}
 <header class="topbar glass">
   <a class="brand" href="{{ url_for('index') }}" aria-label="Home">
-    <span class="avatar sm">{% if profile.avatar %}<img src="{{ media_url(profile.avatar) }}" alt="">{% else %}<span>{{ profile.name[:1]|upper }}</span>{% endif %}</span>
+    <span class="avatar sm">{% if profile.avatar %}<img src="{{ media_url(profile.avatar) }}" alt="" width="34" height="34" decoding="async">{% else %}<span>{{ profile.name[:1]|upper }}</span>{% endif %}</span>
     <span class="brand-name">{{ profile.name }}</span>
   </a>
   <nav class="topnav" aria-label="Sections">
-    <a href="{{ url_for('index') }}#work">Work</a>
     <a href="{{ url_for('index') }}#videos">Videos</a>
+    <a href="{{ url_for('index') }}#work">Work</a>
     <a href="{{ url_for('index') }}#links">Connect</a>
     {% if is_admin() %}<a class="pill-admin" href="{{ url_for('admin_dashboard') }}">Admin</a>{% endif %}
   </nav>

@@ -6,10 +6,10 @@
 
   <!-- HERO -->
   <section class="hero glass reveal" id="home">
-    {% if profile.cover %}<div class="hero-cover"><img src="{{ media_url(profile.cover) }}" alt=""></div>{% endif %}
+    {% if profile.cover %}<div class="hero-cover"><img src="{{ media_url(profile.cover) }}" alt="" decoding="async"></div>{% endif %}
     <div class="hero-main">
       <div class="avatar xl">
-        {% if profile.avatar %}<img src="{{ media_url(profile.avatar) }}" alt="{{ profile.name }}">{% else %}<span>{{ profile.name[:1]|upper }}</span>{% endif %}
+        {% if profile.avatar %}<img src="{{ media_url(profile.avatar) }}" alt="{{ profile.name }}" width="136" height="136" fetchpriority="high" decoding="async">{% else %}<span>{{ profile.name[:1]|upper }}</span>{% endif %}
       </div>
       <div class="hero-text">
         <p class="eyebrow">{{ profile.site_title }}</p>
@@ -22,70 +22,20 @@
         </ul>
         {% endif %}
         {% if profile.bio %}<div class="bio">{{ profile.bio|paragraphs }}</div>{% endif %}
+        {% if links %}
+        <div class="hero-social" aria-label="Social links">
+          {% for l in links[:6] %}<a data-p="{{ l.platform }}" href="{{ l.url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ l.label }}">{{ icon(l.platform, 22) }}</a>{% endfor %}
+        </div>
+        {% endif %}
         <div class="hero-cta">
           <a class="btn btn-primary" href="#videos">{{ icon('play', 18) }} Watch &amp; read</a>
-          {% if links %}<a class="btn btn-glass" href="#links">{{ icon('link', 18) }} Follow &amp; connect</a>{% endif %}
+          {% if links %}<a class="btn btn-glass" href="#links">{{ icon('link', 18) }} Connect</a>{% endif %}
         </div>
       </div>
     </div>
   </section>
 
-  <!-- CONNECT -->
-  <section class="section reveal" id="links" aria-labelledby="h-links">
-    <div class="section-head">
-      <p class="eyebrow">Follow</p>
-      <h2 id="h-links">Follow &amp; connect</h2>
-    </div>
-    {% if links %}
-    <div class="pass-grid">
-      {% for l in links %}
-      <a class="pass" data-p="{{ l.platform }}" href="{{ l.url }}" target="_blank" rel="noopener noreferrer">
-        <span class="pass-ico">{{ icon(l.platform, 26) }}</span>
-        <span class="pass-body">
-          <strong>{{ l.label }}</strong>
-          <small>{{ l.description or dict(PLATFORMS).get(l.platform, 'Open link') }}</small>
-        </span>
-        <span class="pass-go">{{ icon('chevron', 20) }}</span>
-      </a>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="empty glass">
-      <p>No links yet.</p>
-      {% if is_admin() %}<a class="btn btn-primary" href="{{ url_for('admin_link_form') }}">{{ icon('plus', 18) }} Add a link</a>{% endif %}
-    </div>
-    {% endif %}
-  </section>
 
-  <!-- WORK -->
-  <section class="section reveal" id="work" aria-labelledby="h-work">
-    <div class="section-head">
-      <p class="eyebrow">Career</p>
-      <h2 id="h-work">Where he works</h2>
-    </div>
-    {% if work %}
-    <div class="work-grid">
-      {% for w in work %}
-      <article class="work-card glass">
-        <div class="logo">{% if w.logo %}<img src="{{ media_url(w.logo) }}" alt="" loading="lazy">{% else %}{{ icon('work', 26) }}{% endif %}</div>
-        <div class="work-body">
-          <h3>{{ w.role }}</h3>
-          <p class="org">
-            {% if w.url %}<a href="{{ w.url }}" target="_blank" rel="noopener noreferrer">{{ w.org }} {{ icon('external', 14) }}</a>{% else %}{{ w.org }}{% endif %}
-          </p>
-          {% if w.start_year %}<p class="years">{{ w.start_year }} – {{ w.end_year or 'Present' }}</p>{% endif %}
-          {% if w.description %}<div class="work-desc">{{ w.description|paragraphs }}</div>{% endif %}
-        </div>
-      </article>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="empty glass">
-      <p>Work details will appear here.</p>
-      {% if is_admin() %}<a class="btn btn-primary" href="{{ url_for('admin_work_form') }}">{{ icon('plus', 18) }} Add work</a>{% endif %}
-    </div>
-    {% endif %}
-  </section>
 
   <!-- VIDEOS -->
   <section class="section reveal" id="videos" aria-labelledby="h-videos">
@@ -114,7 +64,7 @@
       <a class="post-card glass" href="{{ url_for('post_view', slug=p.slug) }}" data-kind="{{ p.kind }}"
          data-search="{{ (p.title ~ ' ' ~ p.summary ~ ' ' ~ p.tags)|lower }}">
         <div class="thumb">
-          {% if t %}<img src="{{ t }}" alt="" loading="lazy">{% else %}<div class="thumb-fallback">{{ icon('play' if p.video_file else 'doc', 38) }}</div>{% endif %}
+          {% if t %}<img src="{{ t }}" alt="" loading="lazy" decoding="async" width="640" height="360">{% else %}<div class="thumb-fallback">{{ icon('play' if p.video_file else 'doc', 38) }}</div>{% endif %}
           {% if p.kind == 'video' %}<span class="thumb-play">{{ icon('play-solid', 20) }}</span>{% endif %}
           <span class="thumb-tag">{{ 'Video' if p.kind == 'video' else 'Article' }}</span>
         </div>
@@ -138,6 +88,63 @@
     </div>
     {% endif %}
   </section>
+
+  <!-- WORK -->
+  <section class="section reveal" id="work" aria-labelledby="h-work">
+    <div class="section-head">
+      <p class="eyebrow">Career</p>
+      <h2 id="h-work">Where he works</h2>
+    </div>
+    {% if work %}
+    <div class="work-grid">
+      {% for w in work %}
+      <article class="work-card glass">
+        <div class="logo">{% if w.logo %}<img src="{{ media_url(w.logo) }}" alt="" loading="lazy" decoding="async" width="64" height="64">{% else %}{{ icon('work', 26) }}{% endif %}</div>
+        <div class="work-body">
+          <h3>{{ w.role }}</h3>
+          <p class="org">
+            {% if w.url %}<a href="{{ w.url }}" target="_blank" rel="noopener noreferrer">{{ w.org }} {{ icon('external', 14) }}</a>{% else %}{{ w.org }}{% endif %}
+          </p>
+          {% if w.start_year %}<p class="years">{{ w.start_year }} – {{ w.end_year or 'Present' }}</p>{% endif %}
+          {% if w.description %}<div class="work-desc">{{ w.description|paragraphs }}</div>{% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty glass">
+      <p>Work details will appear here.</p>
+      {% if is_admin() %}<a class="btn btn-primary" href="{{ url_for('admin_work_form') }}">{{ icon('plus', 18) }} Add work</a>{% endif %}
+    </div>
+    {% endif %}
+  </section>
+
+  <!-- CONNECT -->
+  <section class="section reveal" id="links" aria-labelledby="h-links">
+    <div class="section-head">
+      <p class="eyebrow">Follow</p>
+      <h2 id="h-links">Follow &amp; connect</h2>
+    </div>
+    {% if links %}
+    <div class="pass-grid">
+      {% for l in links %}
+      <a class="pass" data-p="{{ l.platform }}" href="{{ l.url }}" target="_blank" rel="noopener noreferrer">
+        <span class="pass-ico">{{ icon(l.platform, 26) }}</span>
+        <span class="pass-body">
+          <strong>{{ l.label }}</strong>
+          <small>{{ l.description or dict(PLATFORMS).get(l.platform, 'Open link') }}</small>
+        </span>
+        <span class="pass-go">{{ icon('chevron', 20) }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty glass">
+      <p>No links yet.</p>
+      {% if is_admin() %}<a class="btn btn-primary" href="{{ url_for('admin_link_form') }}">{{ icon('plus', 18) }} Add a link</a>{% endif %}
+    </div>
+    {% endif %}
+  </section>
 </div>
 {% endblock %}
 
@@ -149,11 +156,11 @@
 {% endblock %}
 
 {% block tabbar %}
-<nav class="tabbar glass" aria-label="Sections">
+<nav class="tabbar" aria-label="Sections">
   <a href="#home" data-tab="home" aria-current="true">{{ icon('home', 22) }}<span>Home</span></a>
-  <a href="#links" data-tab="links">{{ icon('link', 22) }}<span>Connect</span></a>
-  <a href="#work" data-tab="work">{{ icon('work', 22) }}<span>Work</span></a>
   <a href="#videos" data-tab="videos">{{ icon('play', 22) }}<span>Videos</span></a>
+  <a href="#work" data-tab="work">{{ icon('work', 22) }}<span>Work</span></a>
+  <a href="#links" data-tab="links">{{ icon('link', 22) }}<span>Connect</span></a>
 </nav>
 {% endblock %}
 
