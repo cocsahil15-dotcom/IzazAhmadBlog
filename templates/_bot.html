@@ -1,0 +1,22 @@
+{% from "_icons.html" import icon %}
+{% set msgs = bot.messages|lines %}
+<div class="shadhin" id="shadhin" data-name="{{ bot.name }}">
+  <div class="sh-panel glass" id="shPanel" role="dialog" aria-label="Chat with {{ bot.name }}" aria-hidden="true">
+    <div class="sh-head">
+      <span class="sh-avatar">{{ bot.name[:1]|upper }}</span>
+      <div class="sh-title"><strong>{{ bot.name }}</strong><small>Online · happy to help</small></div>
+      <button class="sh-x" type="button" data-sh-close aria-label="Close chat">{{ icon('close', 18) }}</button>
+    </div>
+    <div class="sh-log" id="shLog" aria-live="polite"></div>
+    <div class="sh-actions">
+      {% if work %}<a class="sh-chip" href="#work" data-reply="Here is where I work 👇">See my work</a>{% endif %}
+      {% if posts %}<a class="sh-chip" href="#videos" data-reply="Here are my videos 👇">Watch videos</a>{% endif %}
+      {% if links %}<a class="sh-chip" href="#links" data-reply="You can find me here 👇">Follow me</a>{% endif %}
+    </div>
+  </div>
+  <div class="sh-teaser" id="shTeaser" hidden></div>
+  <button class="sh-fab" id="shFab" type="button" aria-label="Chat with {{ bot.name }}" aria-expanded="false" aria-controls="shPanel">
+    <span class="sh-avatar">{{ bot.name[:1]|upper }}</span><i class="sh-dot"></i>
+  </button>
+  <ol hidden id="shMsgs">{% for m in msgs %}<li>{{ m }}</li>{% endfor %}</ol>
+</div>

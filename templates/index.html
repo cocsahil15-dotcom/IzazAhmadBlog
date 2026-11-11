@@ -114,7 +114,7 @@
       <a class="post-card glass" href="{{ url_for('post_view', slug=p.slug) }}" data-kind="{{ p.kind }}"
          data-search="{{ (p.title ~ ' ' ~ p.summary ~ ' ' ~ p.tags)|lower }}">
         <div class="thumb">
-          {% if t %}<img src="{{ t }}" alt="" loading="lazy">{% else %}<div class="thumb-fallback">{{ icon('doc', 38) }}</div>{% endif %}
+          {% if t %}<img src="{{ t }}" alt="" loading="lazy">{% else %}<div class="thumb-fallback">{{ icon('play' if p.video_file else 'doc', 38) }}</div>{% endif %}
           {% if p.kind == 'video' %}<span class="thumb-play">{{ icon('play-solid', 20) }}</span>{% endif %}
           <span class="thumb-tag">{{ 'Video' if p.kind == 'video' else 'Article' }}</span>
         </div>
@@ -166,4 +166,8 @@
     <div class="sheet-body" id="sheetBody"></div>
   </div>
 </div>
+{% endblock %}
+
+{% block bot %}
+{% if bot and bot.enabled %}{% include "_bot.html" %}{% endif %}
 {% endblock %}
