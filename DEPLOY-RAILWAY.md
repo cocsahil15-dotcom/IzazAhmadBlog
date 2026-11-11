@@ -21,11 +21,12 @@ git push -u origin main
 ## 3. Add the database
 In the project canvas: **+ New** -> **Database** -> **Add PostgreSQL**.
 
-## 4. Add a volume (so uploaded pictures are not lost)
+## 4. Add a volume (so pictures, videos and backups are never lost)
 Click the web service -> **Settings** -> **Volumes** (or right-click the canvas -> **Volume**) -> attach it to the web service with mount path:
 ```
 /data
 ```
+This is the most important step. Uploaded pictures, uploaded videos and the automatic backups all live on this volume, so restarts and redeploys cannot erase them.
 
 ## 5. Set the variables
 Web service -> **Variables** -> **Raw Editor**, paste, then edit the values:
@@ -61,6 +62,17 @@ For your own domain: **Custom Domain**, add it, then create the DNS record Railw
   flask --app app create-admin
   ```
 - Updating the site: `git push` and Railway redeploys.
+
+## Backups (Admin -> Backup)
+- A snapshot of all text, comments and settings is saved automatically to `/data/backups` a few minutes after every change.
+- If the database is ever empty when the site starts (for example you deleted and re-created the Postgres service), the newest snapshot is **restored automatically**. Pictures and videos are already on the volume.
+- **Download full backup** gives one zip with everything including pictures and videos. Do this now and then and keep it on your phone/computer.
+- To restore: Admin -> Backup -> choose the zip -> Restore.
+- To really start from zero, delete the snapshots on the Backup page first (or set `AUTO_RESTORE=0`).
+- If the volume itself is deleted, only a downloaded full backup can bring back pictures and videos.
+
+## Uploading videos
+Admin -> Videos & posts -> **Upload video**. Pick or drop an MP4 (MOV/WEBM also work), up to 1 GB by default (`MAX_UPLOAD_MB`). A cover picture is made automatically. Railway cuts requests that last more than about 15 minutes, so for very large files compress the video first. Volume space is limited by your Railway plan.
 
 ## Troubleshooting
 - **500 page / "could not prepare the database" in Deploy Logs**: `DATABASE_URL` is wrong or missing. It must be `${{Postgres.DATABASE_URL}}`.

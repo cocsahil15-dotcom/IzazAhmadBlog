@@ -9,6 +9,11 @@ Flask + PostgreSQL + HTML/CSS/JS. Mobile-friendly public site and a full admin p
 - **Admin panel** at `/admin`: edit profile + pictures, add/edit/delete videos & articles (with cover picture and description), work places (with logo), links, and **read / delete comments** (also directly on the public post when logged in). Drafts, change password.
 - Uploaded images are validated and shrunk automatically.
 
+## New: backups, video upload, Shadhin bot
+- **Admin -> Backup**: automatic snapshots on the volume, one-click full backup download (with pictures and videos), restore from a zip, and automatic restore if the database is ever empty.
+- **Admin -> Videos & posts -> Upload video**: drag in a downloaded video (progress bar, automatic cover picture).
+- **Admin -> Bot**: edit the greeting and messages of **Shadhin**, the welcome bot on the home page.
+
 ## Easiest way: Docker
 ```bash
 cp .env.example .env      # then edit SECRET_KEY and ADMIN_PASSWORD

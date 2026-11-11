@@ -74,3 +74,16 @@ CREATE TABLE IF NOT EXISTS comments (
 );
 CREATE INDEX IF NOT EXISTS comments_post_idx ON comments (post_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS comments_ip_idx ON comments (ip_hash, created_at DESC);
+
+-- Uploaded video file (stored in the uploads folder). Safe to run more than once.
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS video_file TEXT;
+
+-- The "Shadhin" welcome bot shown on the home page (single row, id = 1)
+CREATE TABLE IF NOT EXISTS bot_settings (
+    id         INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    enabled    BOOLEAN NOT NULL DEFAULT TRUE,
+    name       TEXT NOT NULL DEFAULT 'Shadhin',
+    messages   TEXT NOT NULL DEFAULT E'Hi! 👋 My name is Izaz Ahmad. Please see my work.\nEvery video has a short written summary, so you can read it instead of watching.\nYou can leave a comment under any video. I read them all.\nFollow me on YouTube and Facebook so you do not miss new videos.',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO bot_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;

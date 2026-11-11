@@ -27,8 +27,10 @@ services:
       TRUST_PROXY: ${TRUST_PROXY:-0}
       TZ_NAME: ${TZ_NAME:-Asia/Dhaka}
       UPLOAD_DIR: /data/uploads
+      BACKUP_DIR: /data/backups
     volumes:
       - uploads:/data/uploads
+      - backups:/data/backups
     depends_on:
       db:
         condition: service_healthy
@@ -36,3 +38,4 @@ services:
 volumes:
   pgdata:
   uploads:
+  backups:

@@ -4,11 +4,16 @@ Public site  : /
 Admin panel  : /admin
 """
 import hashlib
+import json
 import os
 import re
 import secrets
+import shutil
+import tempfile
+import threading
 import time
 import uuid
+import zipfile
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from functools import wraps
@@ -16,10 +21,11 @@ from urllib.parse import quote, urlparse
 
 import click
 import psycopg2
-from psycopg2 import extras, pool
+from psycopg2 import extras, pool, sql
 from dotenv import load_dotenv
-from flask import (Flask, abort, flash, jsonify, redirect, render_template,
-                   request, send_from_directory, session, url_for)
+from flask import (Flask, abort, after_this_request, flash, jsonify, redirect,
+                   render_template, request, send_file, send_from_directory,
+                   session, url_for)
 from markupsafe import Markup, escape
 from PIL import Image, ImageOps
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -33,8 +39,31 @@ except ImportError:  # pragma: no cover
 load_dotenv()
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-UPLOAD_DIR = os.environ.get("UPLOAD_DIR") or os.path.join(BASE_DIR, "uploads")
+
+
+def _env_int(name, default):
+    try:
+        return int(os.environ.get(name, "").strip() or default)
+    except ValueError:
+        return default
+
+
+# On Railway a Volume sets RAILWAY_VOLUME_MOUNT_PATH. If it is there we keep uploads
+# and backups on it by default, so a redeploy / restart never erases them.
+VOLUME = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH") or ""
+UPLOAD_DIR = os.environ.get("UPLOAD_DIR") or (
+    os.path.join(VOLUME, "uploads") if VOLUME else os.path.join(BASE_DIR, "uploads"))
+BACKUP_DIR = os.environ.get("BACKUP_DIR") or (
+    os.path.join(VOLUME, "backups") if VOLUME else os.path.join(BASE_DIR, "backups"))
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(BACKUP_DIR, exist_ok=True)
+
+MAX_UPLOAD_MB = _env_int("MAX_UPLOAD_MB", 1024)        # videos and backup files
+MAX_IMAGE_BYTES = 12 * 1024 * 1024                     # pictures
+AUTO_BACKUP = os.environ.get("AUTO_BACKUP", "1") != "0"
+AUTO_RESTORE = os.environ.get("AUTO_RESTORE", "1") != "0"
+BACKUP_KEEP = max(5, _env_int("BACKUP_KEEP", 60))      # automatic snapshots to keep
+BACKUP_MIN_MINUTES = max(1, _env_int("BACKUP_MIN_MINUTES", 30))
 
 PLACEHOLDER_PASSWORD = "change-this-password"
 ASSET_V = str(int(time.time()))
@@ -49,7 +78,7 @@ if not _secret or _secret.startswith("change-me"):
 
 app.config.update(
     SECRET_KEY=_secret,
-    MAX_CONTENT_LENGTH=12 * 1024 * 1024,
+    MAX_CONTENT_LENGTH=MAX_UPLOAD_MB * 1024 * 1024,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=os.environ.get("SECURE_COOKIES") == "1",
@@ -118,11 +147,26 @@ def bootstrap_db():
     p = get_pool()
     conn = p.getconn()
     try:
-        with conn.cursor() as cur:
+        with conn.cursor(cursor_factory=extras.RealDictCursor) as cur:
             cur.execute("SELECT pg_advisory_xact_lock(7342)")  # safe with several workers
             cur.execute(schema)
-            cur.execute("SELECT COUNT(*) FROM admin_users")
-            count = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) AS n FROM admin_users")
+            count = cur.fetchone()["n"]
+            if count == 0 and AUTO_RESTORE:
+                # Brand-new / wiped database but we still have a backup on the volume:
+                # bring everything back instead of starting empty.
+                latest = next((b for b in list_backups() if b["kind"] in ("auto", "manual")), None)
+                if latest:
+                    cur.execute("SAVEPOINT auto_restore")
+                    try:
+                        res = restore_from_zip(os.path.join(BACKUP_DIR, latest["name"]), cur)
+                        print(f"Database was empty - restored automatically from '{latest['name']}' "
+                              f"({res['summary']}).")
+                    except Exception as exc:
+                        cur.execute("ROLLBACK TO SAVEPOINT auto_restore")
+                        print(f"WARNING: automatic restore from '{latest['name']}' failed: {exc}")
+                    cur.execute("SELECT COUNT(*) AS n FROM admin_users")
+                    count = cur.fetchone()["n"]
             user = (os.environ.get("ADMIN_USERNAME") or "admin").strip()
             pw = os.environ.get("ADMIN_PASSWORD") or ""
             if count == 0:
@@ -234,6 +278,11 @@ def save_image(file_storage, max_side=1600):
     """Validate + shrink an uploaded image, store as .webp. Returns filename or None."""
     if not file_storage or not file_storage.filename:
         return None
+    file_storage.stream.seek(0, os.SEEK_END)
+    size = file_storage.stream.tell()
+    file_storage.stream.seek(0)
+    if size > MAX_IMAGE_BYTES:
+        raise ValueError("That picture is too large (max 12 MB). Please choose a smaller one.")
     try:
         img = Image.open(file_storage.stream)
         img = ImageOps.exif_transpose(img)
@@ -244,6 +293,48 @@ def save_image(file_storage, max_side=1600):
         return name
     except Exception:
         raise ValueError("That file is not a valid image. Please upload a JPG, PNG, WEBP or GIF.")
+
+
+VIDEO_EXTS = {".mp4", ".m4v", ".mov", ".webm", ".ogv"}
+
+
+def _looks_like_video(head, ext):
+    if head[:4] == b"\x1a\x45\xdf\xa3":
+        return ext == ".webm"
+    if head[:4] == b"OggS":
+        return ext == ".ogv"
+    if head[4:8] in (b"ftyp", b"moov", b"wide", b"mdat", b"free", b"skip"):
+        return ext in (".mp4", ".m4v", ".mov")
+    return False
+
+
+def save_video(file_storage):
+    """Store an uploaded video file as-is (no re-encoding). Returns filename or None."""
+    if not file_storage or not file_storage.filename:
+        return None
+    ext = os.path.splitext(file_storage.filename)[1].lower()
+    if ext not in VIDEO_EXTS:
+        raise ValueError("Please choose a video file (MP4 is best; MOV and WEBM also work).")
+    head = file_storage.stream.read(16)
+    file_storage.stream.seek(0)
+    if not _looks_like_video(head, ext):
+        raise ValueError("That file does not look like a real video. Please try another file.")
+    name = uuid.uuid4().hex + ext
+    path = os.path.join(UPLOAD_DIR, name)
+    try:
+        file_storage.save(path)
+    except Exception:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        raise ValueError("The video could not be saved. Please try again.")
+    return name
+
+
+def video_src(post):
+    name = post.get("video_file") if post else None
+    return media_url(name) if name else None
 
 
 def delete_media(name):
@@ -365,6 +456,7 @@ def inject():
                    "location": "", "email": "", "avatar": None, "cover": None}
     return dict(profile=profile, csrf_token=csrf_token, is_admin=is_admin,
                 media_url=media_url, thumb_url=thumb_url, embed_url=embed_url,
+                video_src=video_src,
                 year=datetime.now(DISPLAY_TZ).year, asset_v=ASSET_V)
 
 
@@ -388,12 +480,22 @@ def security_headers(resp):
     resp.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     resp.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "img-src 'self' data: https://i.ytimg.com https://img.youtube.com; "
+        "img-src 'self' data: blob: https://i.ytimg.com https://img.youtube.com; "
+        "media-src 'self' blob:; "
         "frame-src https://www.youtube-nocookie.com https://www.youtube.com https://www.facebook.com; "
         "style-src 'self' 'unsafe-inline'; script-src 'self'; "
         "base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'self'")
     if request.endpoint in ("admin_login",) or (request.endpoint or "").startswith("admin"):
         resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.after_request
+def mark_changed(resp):
+    """Any successful change by the admin or a visitor comment triggers a fresh backup soon."""
+    if request.method == "POST" and resp.status_code < 400 and (
+            (request.endpoint or "").startswith("admin") or request.endpoint == "add_comment"):
+        _changed.set()
     return resp
 
 
@@ -405,7 +507,7 @@ def security_headers(resp):
 def handle_error(err):
     code = getattr(err, "code", 500) or 500
     msg = {404: "We couldn't find that page.",
-           413: "That upload is too large (max 12 MB).",
+           413: f"That upload is too large (the limit is {MAX_UPLOAD_MB} MB).",
            500: "Something went wrong on our side. Please try again."}.get(
         code, getattr(err, "description", "") or "Something went wrong.")
     if wants_json():
@@ -427,7 +529,11 @@ def index():
     work = query("SELECT * FROM workplaces ORDER BY sort_order, start_year DESC NULLS LAST, id DESC")
     posts = query("""SELECT p.*, (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id) AS comment_count
                      FROM posts p WHERE p.published ORDER BY p.created_at DESC""")
-    return render_template("index.html", links=links, work=work, posts=posts)
+    try:
+        bot = query("SELECT * FROM bot_settings WHERE id=1", one=True)
+    except Exception:
+        bot = None
+    return render_template("index.html", links=links, work=work, posts=posts, bot=bot)
 
 
 @app.route("/post/<slug>")
@@ -554,7 +660,10 @@ def admin_dashboard():
     latest = query("""SELECT c.*, p.title AS post_title, p.slug
                       FROM comments c JOIN posts p ON p.id = c.post_id
                       ORDER BY c.created_at DESC LIMIT 6""")
-    return render_template("admin/dashboard.html", stats=stats, latest=latest)
+    backups = list_backups()
+    return render_template("admin/dashboard.html", stats=stats, latest=latest,
+                           last_backup=backups[0] if backups else None,
+                           storage=storage_status())
 
 
 # ---------------------------------------------------------------------------
@@ -742,6 +851,7 @@ def admin_post_form(post_id=None):
         title = clean(f.get("title"), 140)
         video_url = clean(f.get("video_url"), 500)
         error = None
+        thumb = new_video = None
         if not title:
             error = "Please enter a title."
         elif video_url and not valid_url(video_url):
@@ -749,15 +859,25 @@ def admin_post_form(post_id=None):
         if not error:
             try:
                 thumb = save_image(request.files.get("thumb"), 1280)
+                new_video = save_video(request.files.get("video_file"))
             except ValueError as e:
-                error, thumb = str(e), None
+                error = str(e)
+                delete_media(thumb)
+                thumb = None
         if error:
+            if wants_json():
+                return jsonify(ok=False, error=error), 400
             flash(error, "err")
             item = dict(f, id=post_id, thumb=item and item["thumb"],
+                        video_file=item and item["video_file"],
                         published=bool(f.get("published")))
         else:
-            kind = "video" if video_url else "article"
-            platform = detect_platform(video_url)
+            old_video = item["video_file"] if item else None
+            final_video = old_video
+            if new_video or f.get("remove_video"):
+                final_video = new_video
+            kind = "video" if (video_url or final_video) else "article"
+            platform = detect_platform(video_url) if video_url else ("upload" if final_video else "other")
             summary = clean(f.get("summary"), 400, True)
             desc = clean(f.get("description"), 20000, True)
             points = clean(f.get("key_points"), 3000, True)
@@ -769,28 +889,33 @@ def admin_post_form(post_id=None):
                     delete_media(item["thumb"])
                     new_thumb = thumb
                 execute("""UPDATE posts SET title=%s, kind=%s, platform=%s, video_url=%s, thumb=%s,
-                           summary=%s, description=%s, key_points=%s, tags=%s, published=%s,
-                           updated_at=now() WHERE id=%s""",
-                        (title, kind, platform, video_url, new_thumb, summary, desc, points,
-                         tags, published, post_id))
+                           video_file=%s, summary=%s, description=%s, key_points=%s, tags=%s,
+                           published=%s, updated_at=now() WHERE id=%s""",
+                        (title, kind, platform, video_url, new_thumb, final_video, summary, desc,
+                         points, tags, published, post_id))
+                if final_video != old_video:
+                    delete_media(old_video)
             else:
-                execute("""INSERT INTO posts (slug, title, kind, platform, video_url, thumb, summary,
-                           description, key_points, tags, published)
-                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                        (make_slug(title), title, kind, platform, video_url, thumb, summary, desc,
-                         points, tags, published))
+                execute("""INSERT INTO posts (slug, title, kind, platform, video_url, thumb, video_file,
+                           summary, description, key_points, tags, published)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                        (make_slug(title), title, kind, platform, video_url, thumb, final_video,
+                         summary, desc, points, tags, published))
             flash("Saved." if item else "Published! It is now on your site." if published
                   else "Saved as a draft.", "ok")
+            if wants_json():
+                return jsonify(ok=True, redirect=url_for("admin_posts"))
             return redirect(url_for("admin_posts"))
-    return render_template("admin/post_form.html", item=item)
+    return render_template("admin/post_form.html", item=item, max_mb=MAX_UPLOAD_MB)
 
 
 @app.post("/admin/posts/<int:post_id>/delete")
 @admin_required
 def admin_post_delete(post_id):
-    row = query("SELECT thumb FROM posts WHERE id=%s", (post_id,), one=True)
+    row = query("SELECT thumb, video_file FROM posts WHERE id=%s", (post_id,), one=True)
     if row:
         delete_media(row["thumb"])
+        delete_media(row["video_file"])
         execute("DELETE FROM posts WHERE id=%s", (post_id,))  # comments cascade
     flash("Deleted.", "ok")
     return redirect(url_for("admin_posts"))
@@ -835,6 +960,438 @@ def admin_delete_comment(comment_id):
 
 
 # ---------------------------------------------------------------------------
+# Backups
+#   * automatic snapshots (data only, small) are written to BACKUP_DIR (the Railway volume)
+#   * a "full backup" download also contains every picture and video
+#   * if the database is ever empty on start-up, the newest snapshot is restored by itself
+# ---------------------------------------------------------------------------
+BACKUP_TABLES = ["admin_users", "profile", "social_links", "workplaces", "posts",
+                 "comments", "bot_settings"]
+BACKUP_FORMAT = 1
+BACKUP_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.zip$")
+_backup_lock = threading.Lock()
+_changed = threading.Event()
+
+
+class BackupError(Exception):
+    pass
+
+
+def storage_status():
+    """Tell the admin whether uploads/backups will survive a redeploy."""
+    on_railway = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_PROJECT_ID"))
+
+    def inside_volume(path):
+        return bool(VOLUME) and os.path.abspath(path).startswith(os.path.abspath(VOLUME))
+    persistent = (not on_railway) or (inside_volume(UPLOAD_DIR) and inside_volume(BACKUP_DIR))
+    return {"on_railway": on_railway, "persistent": persistent, "volume": VOLUME,
+            "upload_dir": UPLOAD_DIR, "backup_dir": BACKUP_DIR}
+
+
+def _json_default(o):
+    return o.isoformat() if isinstance(o, datetime) else str(o)
+
+
+def dump_tables(cur):
+    data = {}
+    for t in BACKUP_TABLES:
+        cur.execute(sql.SQL("SELECT * FROM {} ORDER BY 1").format(sql.Identifier(t)))
+        data[t] = [dict(r) for r in cur.fetchall()]
+    return data
+
+
+def uploads_size():
+    total = count = 0
+    try:
+        for e in os.scandir(UPLOAD_DIR):
+            if e.is_file():
+                total += e.stat().st_size
+                count += 1
+    except OSError:
+        pass
+    return total, count
+
+
+def write_backup_zip(dest, data, include_media):
+    payload = json.dumps(data, default=_json_default, ensure_ascii=False).encode("utf-8")
+    manifest = {"app": "cousin-site", "format": BACKUP_FORMAT,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "includes_media": bool(include_media),
+                "data_sha256": hashlib.sha256(payload).hexdigest(),
+                "counts": {t: len(rows) for t, rows in data.items()}}
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
+        zf.writestr("manifest.json", json.dumps(manifest, indent=2))
+        zf.writestr("data.json", payload)
+        if include_media:
+            for e in sorted(os.scandir(UPLOAD_DIR), key=lambda x: x.name):
+                if e.is_file() and not e.name.endswith(".part"):
+                    zf.write(e.path, "uploads/" + e.name, compress_type=zipfile.ZIP_STORED)
+    return manifest
+
+
+def _kind(name):
+    if name.startswith("auto-"):
+        return "auto"
+    if name.startswith("pre-restore-"):
+        return "pre-restore"
+    return "manual"
+
+
+def list_backups():
+    items = []
+    try:
+        names = os.listdir(BACKUP_DIR)
+    except OSError:
+        return items
+    for n in names:
+        if not BACKUP_NAME_RE.match(n):
+            continue
+        try:
+            st = os.stat(os.path.join(BACKUP_DIR, n))
+        except OSError:
+            continue
+        items.append({"name": n, "size": st.st_size, "kind": _kind(n),
+                      "mtime": datetime.fromtimestamp(st.st_mtime, timezone.utc)})
+    items.sort(key=lambda x: x["mtime"], reverse=True)
+    return items
+
+
+def prune_backups():
+    limits = {"auto": BACKUP_KEEP, "pre-restore": 5}
+    seen = {}
+    for b in list_backups():
+        seen[b["kind"]] = seen.get(b["kind"], 0) + 1
+        lim = limits.get(b["kind"])
+        if lim and seen[b["kind"]] > lim:
+            try:
+                os.remove(os.path.join(BACKUP_DIR, b["name"]))
+            except OSError:
+                pass
+
+
+def _unique_backup_path(kind):
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    name, i = f"{kind}-{stamp}.zip", 2
+    while os.path.exists(os.path.join(BACKUP_DIR, name)):
+        name = f"{kind}-{stamp}-{i}.zip"
+        i += 1
+    return name, os.path.join(BACKUP_DIR, name)
+
+
+def create_server_backup(kind="manual"):
+    """Save a data snapshot into BACKUP_DIR. Returns the file name."""
+    name, final = _unique_backup_path(kind)
+    with db() as cur:
+        data = dump_tables(cur)
+    write_backup_zip(final + ".part", data, False)
+    os.replace(final + ".part", final)
+    prune_backups()
+    return name
+
+
+def _db_is_empty(cur):
+    cur.execute("SELECT (SELECT COUNT(*) FROM admin_users) + (SELECT COUNT(*) FROM posts) AS n")
+    return cur.fetchone()["n"] == 0
+
+
+def auto_backup_if_due():
+    """Safe to call from every worker: only one of them makes the snapshot."""
+    p = get_pool()
+    conn = p.getconn()
+    try:
+        with conn.cursor(cursor_factory=extras.RealDictCursor) as cur:
+            cur.execute("SELECT pg_try_advisory_xact_lock(7343) AS ok")
+            if not cur.fetchone()["ok"]:
+                conn.rollback()
+                return None
+            if _db_is_empty(cur):      # never let an empty database replace good snapshots
+                conn.rollback()
+                return None
+            autos = [b for b in list_backups() if b["kind"] == "auto"]
+            if autos and time.time() - autos[0]["mtime"].timestamp() < BACKUP_MIN_MINUTES * 60:
+                conn.rollback()
+                return None
+            data = dump_tables(cur)
+            name, final = _unique_backup_path("auto")
+            if autos:
+                try:
+                    with zipfile.ZipFile(os.path.join(BACKUP_DIR, autos[0]["name"])) as zf:
+                        last = json.loads(zf.read("manifest.json")).get("data_sha256")
+                except Exception:
+                    last = None
+                fresh = hashlib.sha256(json.dumps(
+                    data, default=_json_default, ensure_ascii=False).encode("utf-8")).hexdigest()
+                if last == fresh:      # nothing changed since the last snapshot
+                    os.utime(os.path.join(BACKUP_DIR, autos[0]["name"]))
+                    conn.rollback()
+                    return None
+            write_backup_zip(final + ".part", data, False)
+            os.replace(final + ".part", final)
+        conn.commit()
+        prune_backups()
+        return name
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        p.putconn(conn)
+
+
+def _backup_loop():
+    time.sleep(15)
+    while True:
+        try:
+            auto_backup_if_due()
+        except Exception as exc:
+            print(f"WARNING: automatic backup failed: {exc}")
+        if _changed.wait(timeout=600):   # wake up soon after something was edited
+            time.sleep(60)
+            _changed.clear()
+
+
+_backup_thread = None
+
+
+def start_backup_thread():
+    global _backup_thread
+    if AUTO_BACKUP and _backup_thread is None:
+        _backup_thread = threading.Thread(target=_backup_loop, name="auto-backup", daemon=True)
+        _backup_thread.start()
+
+
+def restore_from_zip(path, cur):
+    """Restore a backup inside the caller's transaction (cur must be a RealDictCursor)."""
+    try:
+        zf = zipfile.ZipFile(path)
+    except (zipfile.BadZipFile, OSError):
+        raise BackupError("That file is not a valid backup (.zip) file.")
+    with zf:
+        names = set(zf.namelist())
+        if "manifest.json" not in names or "data.json" not in names:
+            raise BackupError("This zip was not made by this website's backup tool.")
+        try:
+            manifest = json.loads(zf.read("manifest.json"))
+        except ValueError:
+            raise BackupError("The backup's manifest is damaged.")
+        if manifest.get("app") != "cousin-site":
+            raise BackupError("This zip was not made by this website's backup tool.")
+        if int(manifest.get("format") or 0) > BACKUP_FORMAT:
+            raise BackupError("This backup comes from a newer version of the site.")
+        if zf.getinfo("data.json").file_size > 512 * 1024 * 1024:
+            raise BackupError("The backup data is unexpectedly large.")
+        try:
+            data = json.loads(zf.read("data.json"))
+        except ValueError:
+            raise BackupError("The backup data is damaged.")
+        if not isinstance(data, dict):
+            raise BackupError("The backup data is damaged.")
+
+        # 1) pictures / videos (additive; never deletes anything)
+        media = 0
+        for info in zf.infolist():
+            if info.is_dir() or not info.filename.startswith("uploads/"):
+                continue
+            name = info.filename[len("uploads/"):]
+            if not name or "/" in name or "\\" in name or name.startswith("."):
+                continue
+            dest = os.path.join(UPLOAD_DIR, name)
+            if os.path.isfile(dest) and os.path.getsize(dest) == info.file_size:
+                continue
+            tmp = dest + ".part"
+            with zf.open(info) as src, open(tmp, "wb") as out:
+                shutil.copyfileobj(src, out, 1024 * 1024)
+            os.replace(tmp, dest)
+            media += 1
+
+        # 2) database rows
+        tables = [t for t in BACKUP_TABLES if isinstance(data.get(t), list)]
+        if not tables:
+            raise BackupError("This backup contains no site data.")
+        cur.execute(sql.SQL("TRUNCATE {} RESTART IDENTITY CASCADE").format(
+            sql.SQL(", ").join(sql.Identifier(t) for t in tables)))
+        counts = {}
+        for t in tables:
+            cur.execute("""SELECT column_name FROM information_schema.columns
+                           WHERE table_schema = current_schema() AND table_name = %s""", (t,))
+            valid = {r["column_name"] for r in cur.fetchall()}
+            rows = [r for r in data[t] if isinstance(r, dict)]
+            counts[t] = len(rows)
+            if not rows:
+                continue
+            cols = sorted({k for r in rows for k in r if k in valid})
+            values = [tuple(r.get(c) for c in cols) for r in rows]
+            stmt = sql.SQL("INSERT INTO {} ({}) VALUES %s").format(
+                sql.Identifier(t), sql.SQL(", ").join(sql.Identifier(c) for c in cols)).as_string(cur)
+            extras.execute_values(cur, stmt, values)
+        for t in tables:
+            cur.execute("SELECT pg_get_serial_sequence(%s, 'id') AS s", (t,))
+            seq = cur.fetchone()["s"]
+            if seq:
+                cur.execute(sql.SQL("SELECT setval(%s, COALESCE((SELECT MAX(id) FROM {}), 0) + 1, false)")
+                            .format(sql.Identifier(t)), (seq,))
+        cur.execute("INSERT INTO profile (id) VALUES (1) ON CONFLICT (id) DO NOTHING")
+        cur.execute("INSERT INTO bot_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING")
+
+    summary = (f"{counts.get('posts', 0)} videos/posts, {counts.get('comments', 0)} comments, "
+               f"{counts.get('workplaces', 0)} work places, {counts.get('social_links', 0)} links, "
+               f"{media} media files")
+    return {"counts": counts, "media": media, "summary": summary}
+
+
+def run_restore(path):
+    """Restore from an admin action. Takes a safety snapshot first."""
+    with _backup_lock:
+        p = get_pool()
+        conn = p.getconn()
+        try:
+            with conn.cursor(cursor_factory=extras.RealDictCursor) as cur:
+                if not _db_is_empty(cur):
+                    conn.rollback()
+                    create_server_backup("pre-restore")
+                cur.execute("SELECT pg_advisory_xact_lock(7342)")
+                result = restore_from_zip(path, cur)
+            conn.commit()
+            return result
+        except BackupError:
+            conn.rollback()
+            raise
+        except Exception as exc:
+            conn.rollback()
+            print(f"Restore failed: {exc}")
+            raise BackupError("The backup could not be restored. Nothing was changed.")
+        finally:
+            p.putconn(conn)
+
+
+def _after_restore_redirect(result):
+    flash("Restored: " + result["summary"] + ".", "ok")
+    if not query("SELECT 1 FROM admin_users WHERE id=%s", (session.get("admin_id"),), one=True):
+        session.clear()
+        flash("Please log in again (using the password the backup had).", "ok")
+        return redirect(url_for("admin_login"))
+    return redirect(url_for("admin_backup"))
+
+
+@app.route("/admin/backup")
+@admin_required
+def admin_backup():
+    size, files = uploads_size()
+    return render_template("admin/backup.html", backups=list_backups(), storage=storage_status(),
+                           uploads_size=size, uploads_count=files, max_mb=MAX_UPLOAD_MB,
+                           auto=AUTO_BACKUP, keep=BACKUP_KEEP)
+
+
+@app.get("/admin/backup/download")
+@admin_required
+def admin_backup_download():
+    """Full backup: all data + every picture and video, as one zip."""
+    fd, tmp = tempfile.mkstemp(prefix="full-backup-", suffix=".zip")
+    os.close(fd)
+    with db() as cur:
+        data = dump_tables(cur)
+    write_backup_zip(tmp, data, True)
+
+    @after_this_request
+    def _cleanup(resp):
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        return resp
+    stamp = datetime.now(DISPLAY_TZ).strftime("%Y-%m-%d_%H%M")
+    return send_file(tmp, as_attachment=True, download_name=f"site-backup-{stamp}.zip",
+                     mimetype="application/zip", max_age=0)
+
+
+@app.post("/admin/backup/create")
+@admin_required
+def admin_backup_create():
+    try:
+        create_server_backup("manual")
+        flash("Backup saved on the server.", "ok")
+    except Exception as exc:
+        print(f"Backup failed: {exc}")
+        flash("The backup could not be saved. Please try again.", "err")
+    return redirect(url_for("admin_backup"))
+
+
+@app.post("/admin/backup/upload")
+@admin_required
+def admin_backup_upload():
+    f = request.files.get("backup")
+    if not f or not f.filename:
+        flash("Please choose a backup file first.", "err")
+        return redirect(url_for("admin_backup"))
+    fd, tmp = tempfile.mkstemp(prefix="restore-", suffix=".zip")
+    os.close(fd)
+    try:
+        f.save(tmp)
+        result = run_restore(tmp)
+    except BackupError as e:
+        flash(str(e), "err")
+        return redirect(url_for("admin_backup"))
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+    return _after_restore_redirect(result)
+
+
+def _backup_path(name):
+    if not BACKUP_NAME_RE.match(name or ""):
+        abort(404)
+    path = os.path.join(BACKUP_DIR, name)
+    if not os.path.isfile(path):
+        abort(404)
+    return path
+
+
+@app.get("/admin/backup/file/<name>")
+@admin_required
+def admin_backup_file(name):
+    _backup_path(name)
+    return send_from_directory(BACKUP_DIR, name, as_attachment=True, max_age=0)
+
+
+@app.post("/admin/backup/file/<name>/restore")
+@admin_required
+def admin_backup_restore(name):
+    try:
+        result = run_restore(_backup_path(name))
+    except BackupError as e:
+        flash(str(e), "err")
+        return redirect(url_for("admin_backup"))
+    return _after_restore_redirect(result)
+
+
+@app.post("/admin/backup/file/<name>/delete")
+@admin_required
+def admin_backup_delete(name):
+    os.remove(_backup_path(name))
+    flash("Backup deleted.", "ok")
+    return redirect(url_for("admin_backup"))
+
+
+# ---------------------------------------------------------------------------
+# Admin: Shadhin bot
+# ---------------------------------------------------------------------------
+@app.route("/admin/bot", methods=["GET", "POST"])
+@admin_required
+def admin_bot():
+    if request.method == "POST":
+        f = request.form
+        lines = [clean(ln, 240) for ln in (f.get("messages") or "").replace("\r", "").split("\n")]
+        lines = [ln for ln in lines if ln][:12]
+        execute("""UPDATE bot_settings SET enabled=%s, name=%s, messages=%s, updated_at=now()
+                   WHERE id=1""",
+                (bool(f.get("enabled")), clean(f.get("name"), 30) or "Shadhin", "\n".join(lines)))
+        flash("Bot saved.", "ok")
+        return redirect(url_for("admin_bot"))
+    return render_template("admin/bot.html", bot=query("SELECT * FROM bot_settings WHERE id=1", one=True))
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 @app.cli.command("init-db")
@@ -862,6 +1419,8 @@ if os.environ.get("AUTO_INIT", "1") == "1" and os.environ.get("DATABASE_URL"):
         bootstrap_db()
     except Exception as exc:  # keep the app importable so errors are visible
         print(f"WARNING: could not prepare the database: {exc}")
+    else:
+        start_backup_thread()
 
 
 if __name__ == "__main__":
