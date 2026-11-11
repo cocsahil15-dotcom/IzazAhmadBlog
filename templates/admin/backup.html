@@ -1,0 +1,60 @@
+{% extends "admin/base.html" %}
+{% from "_icons.html" import icon %}
+{% block admin %}
+<div class="page-head"><h1>Backup &amp; restore</h1>
+  <p class="muted">Keeps everything safe when the site restarts, redeploys or Railway deletes the database.</p></div>
+
+{% if not storage.persistent %}
+<div class="notice warn glass"><strong>Attach a Railway volume.</strong>
+  <span>Without a volume, uploads and the backups below live inside the container and disappear on every redeploy. Railway → web service → Settings → Volumes → mount path <code>/data</code>, then redeploy. Until then, download a full backup regularly.</span></div>
+{% else %}
+<div class="notice ok glass"><strong>Protected.</strong>
+  <span>Pictures, videos and backups are stored on the persistent volume{% if storage.volume %} (<code>{{ storage.volume }}</code>){% endif %}.
+  {% if auto %}A snapshot is saved automatically a few minutes after every change (last {{ keep }} kept). If the database is ever empty on start-up, the newest snapshot is restored by itself.{% endif %}</span></div>
+{% endif %}
+
+<section class="panel glass">
+  <div class="panel-head"><h2>Download a full backup</h2></div>
+  <p class="muted">One zip with all your text, comments, settings{% if uploads_count %}, and {{ uploads_count }} pictures/videos ({{ (uploads_size / 1048576)|round(1) }} MB){% endif %}. Keep a copy on your computer or phone. It also contains the admin password hash, so keep it private.</p>
+  <div class="quick" style="margin:14px 0 0">
+    <a class="btn btn-primary" href="{{ url_for('admin_backup_download') }}">{{ icon('download', 18) }} Download full backup</a>
+    <form method="post" action="{{ url_for('admin_backup_create') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-glass" type="submit">{{ icon('shield', 18) }} Save a snapshot on the server now</button></form>
+  </div>
+</section>
+
+<section class="panel glass" style="margin-top:18px">
+  <div class="panel-head"><h2>Restore from a backup file</h2></div>
+  <p class="muted">Choose a zip you downloaded earlier (up to {{ max_mb }} MB). This replaces the current site content with the backup. A safety snapshot of the current content is saved first.</p>
+  <form method="post" action="{{ url_for('admin_backup_upload') }}" enctype="multipart/form-data" class="restore-form"
+        data-confirm="Replace everything on the site with this backup?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input class="input file" type="file" name="backup" accept=".zip,application/zip" required>
+    <button class="btn btn-danger" type="submit">{{ icon('upload', 18) }} Restore</button>
+  </form>
+</section>
+
+<section class="panel glass" style="margin-top:18px">
+  <div class="panel-head"><h2>Snapshots on the server</h2></div>
+  {% if backups %}
+  <ul class="list">
+    {% for b in backups %}
+    <li class="list-item glass">
+      <div class="li-main">
+        <strong>{{ b.name }}</strong>
+        <span class="muted">{{ {'auto': 'Automatic', 'manual': 'Manual', 'pre-restore': 'Before a restore'}[b.kind] }} · {{ b.mtime|dtfull }} · {{ (b.size / 1024)|round(0)|int }} KB</span>
+      </div>
+      <div class="li-actions">
+        <a class="btn btn-glass btn-sm" href="{{ url_for('admin_backup_file', name=b.name) }}">{{ icon('download', 16) }}<span class="hide-sm"> Download</span></a>
+        <form method="post" action="{{ url_for('admin_backup_restore', name=b.name) }}" data-confirm="Restore the site to this snapshot? Newer changes will be replaced.">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-glass btn-sm" type="submit">Restore</button></form>
+        <form method="post" action="{{ url_for('admin_backup_delete', name=b.name) }}" data-confirm="Delete this snapshot?">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-danger btn-sm" type="submit" aria-label="Delete">{{ icon('trash', 16) }}</button></form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="muted" style="margin-top:12px">Snapshots hold text and settings only; pictures and videos already live on the volume. Use the full backup download for a copy that includes media.</p>
+  {% else %}<p class="muted">No snapshots yet. The first one is made automatically shortly after the site starts.</p>{% endif %}
+</section>
+{% endblock %}

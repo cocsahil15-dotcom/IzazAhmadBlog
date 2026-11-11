@@ -1,0 +1,15 @@
+{% extends "admin/base.html" %}
+{% from "_icons.html" import icon %}
+{% block admin %}
+<div class="page-head"><h1>Welcome bot</h1><p class="muted">A friendly bot that greets visitors on the home page and points them to your work.</p></div>
+<form class="form glass" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label class="check big"><input type="checkbox" name="enabled" value="1" {% if bot.enabled %}checked{% endif %}>
+    <span><strong>Show the bot</strong><small>Untick to hide it from the site.</small></span></label>
+  <label class="field"><span>Bot name</span><input class="input" name="name" maxlength="30" value="{{ bot.name }}"></label>
+  <label class="field"><span>Messages <em>(one per line)</em></span>
+    <textarea class="input" name="messages" rows="8" maxlength="2500">{{ bot.messages }}</textarea>
+    <small>The first line is the greeting visitors see pop up. The other lines follow one by one when they open the chat.</small></label>
+  <div class="form-actions"><button class="btn btn-primary" type="submit">{{ icon('check', 18) }} Save</button></div>
+</form>
+{% endblock %}

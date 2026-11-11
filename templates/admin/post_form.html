@@ -6,16 +6,31 @@
   <h1>{{ 'Edit' if item and item.id else 'New video / post' }}</h1>
 </div>
 
-<form class="form glass" method="post" enctype="multipart/form-data">
+<form class="form glass" method="post" enctype="multipart/form-data" data-max-mb="{{ max_mb }}" id="postForm">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
   <label class="field"><span>Title *</span>
     <input class="input" name="title" maxlength="140" required value="{{ item.title if item else '' }}"></label>
 
-  <label class="field"><span>Video link <em>(optional)</em></span>
+  <div class="field" id="video-upload"><span>Upload a video <em>(optional)</em></span>
+    <label class="dropzone" id="videoDrop" for="videoFile">
+      {{ icon('upload', 28) }}
+      <strong id="videoName">Tap to choose a video, or drop it here</strong>
+      <small>MP4 works best (MOV and WEBM too) · up to {{ max_mb }} MB</small>
+    </label>
+    <input class="sr" type="file" name="video_file" id="videoFile" accept="video/mp4,video/quicktime,video/webm,video/ogg,.mp4,.m4v,.mov,.webm,.ogv">
+    {% if item and item.video_file %}
+    <video class="preview" controls preload="metadata" src="{{ media_url(item.video_file) }}"></video>
+    <label class="check"><input type="checkbox" name="remove_video" value="1"> Remove the uploaded video</label>
+    {% endif %}
+    <div class="progress" id="uploadProgress" hidden><i></i><span>Uploading… 0%</span></div>
+    <small>Use this for a video you downloaded. A cover picture is made from the video automatically.</small>
+  </div>
+
+  <label class="field"><span>Or a video link <em>(optional)</em></span>
     <input class="input" type="url" name="video_url" maxlength="500" inputmode="url" placeholder="https://www.youtube.com/watch?v=…"
            value="{{ item.video_url if item else '' }}">
-    <small>YouTube or Facebook link. Leave empty to publish a written article instead.</small></label>
+    <small>YouTube or Facebook link. Leave this and the upload empty to publish a written article.</small></label>
 
   <div class="field"><span>Cover picture <em>(optional)</em></span>
     {% if item and item.thumb %}<img class="preview" id="thumbPrev" src="{{ media_url(item.thumb) }}" alt="">{% else %}<img class="preview" id="thumbPrev" alt="" hidden>{% endif %}
@@ -40,6 +55,7 @@
   <label class="check big"><input type="checkbox" name="published" value="1" {% if not item or item.published %}checked{% endif %}>
     <span><strong>Published</strong><small>Untick to keep it as a private draft.</small></span></label>
 
+  <p class="form-msg" id="formMsg" role="status"></p>
   <div class="form-actions">
     <button class="btn btn-primary" type="submit">{{ icon('check', 18) }} Save</button>
     <a class="btn btn-glass" href="{{ url_for('admin_posts') }}">Cancel</a>

@@ -10,8 +10,16 @@
   <a class="stat glass" href="{{ url_for('admin_links') }}"><span class="stat-n">{{ stats.links }}</span><span>Links</span></a>
 </div>
 
+{% if not storage.persistent %}
+<div class="notice warn glass"><strong>Your data is not protected yet.</strong>
+  <span>No Railway volume is attached, so uploads and backups would be lost on a redeploy. Add a volume (see Backup page) and download a backup now.</span>
+  <a class="btn btn-glass btn-sm" href="{{ url_for('admin_backup') }}">{{ icon('shield', 16) }} Open Backup</a></div>
+{% endif %}
+
 <div class="quick">
-  <a class="btn btn-primary" href="{{ url_for('admin_post_form') }}">{{ icon('plus', 18) }} New video / post</a>
+  <a class="btn btn-primary" href="{{ url_for('admin_post_form') }}#video-upload">{{ icon('upload', 18) }} Upload video</a>
+  <a class="btn btn-glass" href="{{ url_for('admin_post_form') }}">{{ icon('plus', 18) }} New video / post</a>
+  <a class="btn btn-glass" href="{{ url_for('admin_backup') }}">{{ icon('shield', 18) }} Backup{% if last_backup %} · {{ last_backup.mtime|ago }}{% endif %}</a>
   <a class="btn btn-glass" href="{{ url_for('admin_profile') }}">{{ icon('user', 18) }} Edit profile</a>
   <a class="btn btn-glass" href="{{ url_for('admin_password') }}">{{ icon('lock', 18) }} Change password</a>
 </div>

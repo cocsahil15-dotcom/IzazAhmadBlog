@@ -3,7 +3,7 @@
 {% block admin %}
 <div class="page-head row">
   <div><h1>Videos &amp; posts</h1><p class="muted">Add a video link or write an article. Each one gets its own readable page.</p></div>
-  <a class="btn btn-primary" href="{{ url_for('admin_post_form') }}">{{ icon('plus', 18) }} New</a>
+  <div class="quick" style="margin:0"><a class="btn btn-primary" href="{{ url_for('admin_post_form') }}#video-upload">{{ icon('upload', 18) }} Upload video</a><a class="btn btn-glass" href="{{ url_for('admin_post_form') }}">{{ icon('plus', 18) }} New</a></div>
 </div>
 
 {% if items %}
@@ -11,11 +11,11 @@
   {% for p in items %}
   {% set t = thumb_url(p) %}
   <li class="list-item glass">
-    <div class="li-thumb">{% if t %}<img src="{{ t }}" alt="" loading="lazy">{% else %}{{ icon('doc', 26) }}{% endif %}</div>
+    <div class="li-thumb">{% if t %}<img src="{{ t }}" alt="" loading="lazy">{% else %}{{ icon('play' if p.video_file else 'doc', 26) }}{% endif %}</div>
     <div class="li-main">
       <strong>{{ p.title }}</strong>
       <span class="muted">
-        {{ 'Video' if p.kind == 'video' else 'Article' }} · {{ p.created_at|dt }} · {{ p.comment_count }} comment{{ '' if p.comment_count == 1 else 's' }}
+        {{ 'Video' if p.kind == 'video' else 'Article' }}{% if p.video_file %} (uploaded){% endif %} · {{ p.created_at|dt }} · {{ p.comment_count }} comment{{ '' if p.comment_count == 1 else 's' }}
         · <span class="status {{ 'on' if p.published else 'off' }}">{{ 'Published' if p.published else 'Draft' }}</span>
       </span>
     </div>
