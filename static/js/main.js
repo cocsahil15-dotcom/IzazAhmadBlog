@@ -30,20 +30,6 @@
     if (img && file) { img.src = URL.createObjectURL(file); img.hidden = false; }
   });
 
-  /* ---- liquid-glass rim light follows the pointer ---- */
-  let raf = 0;
-  document.addEventListener('pointermove', e => {
-    if (e.pointerType !== 'mouse') return;
-    const el = e.target.closest && e.target.closest('.glass');
-    if (!el) return;
-    cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(() => {
-      const r = el.getBoundingClientRect();
-      el.style.setProperty('--mx', (e.clientX - r.left) + 'px');
-      el.style.setProperty('--my', (e.clientY - r.top) + 'px');
-    });
-  }, { passive: true });
-
   /* ---- search + filter on the home page ---- */
   const grid = $('#postGrid');
   if (grid) {
@@ -66,7 +52,8 @@
       chips.forEach(c => c.classList.toggle('active', c === ch));
       apply();
     }));
-    if (q) q.addEventListener('input', apply);
+    let st = 0;
+    if (q) q.addEventListener('input', () => { clearTimeout(st); st = setTimeout(apply, 120); });
   }
 
   /* ---- mobile tab bar: highlight the section in view ---- */
