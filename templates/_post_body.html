@@ -14,9 +14,9 @@
 
   <div class="post-head">
     <div class="badges">
-      <span class="badge">{{ 'Video' if post.kind == 'video' else 'Article' }}</span>
+      <span class="badge" data-t>{{ 'Video' if post.kind == 'video' else 'Article' }}</span>
       {% if post.platform == 'youtube' %}<span class="badge badge-youtube">YouTube</span>{% elif post.platform == 'facebook' %}<span class="badge badge-facebook">Facebook</span>{% endif %}
-      <span class="muted">{{ post.created_at|dt }}</span>
+      <span class="muted">{{ post.created_at|dtx(true) }}</span>
     </div>
     <h2>{{ post.title }}</h2>
   </div>
@@ -26,14 +26,14 @@
   {% set points = post.key_points|lines %}
   {% if points %}
   <section class="keypoints">
-    <h3>Key points</h3>
+    <h3 data-t>Key points</h3>
     <ul>{% for pt in points %}<li>{{ icon('check', 16) }}<span>{{ pt }}</span></li>{% endfor %}</ul>
   </section>
   {% endif %}
 
   {% if post.description %}
   <section class="prose">
-    <h3>{{ 'What this video covers' if post.kind == 'video' else 'Read' }}</h3>
+    <h3 data-t>{{ 'What this video covers' if post.kind == 'video' else 'Read' }}</h3>
     {{ post.description|paragraphs }}
   </section>
   {% endif %}
@@ -41,10 +41,10 @@
   <div class="actions">
     {% if post.video_url %}
     <a class="btn btn-glass" href="{{ post.video_url }}" target="_blank" rel="noopener noreferrer">
-      {{ icon('external', 17) }} Open on {{ 'YouTube' if post.platform == 'youtube' else 'Facebook' if post.platform == 'facebook' else 'the original site' }}
+      {{ icon('external', 17) }} <span data-t>Open on</span> {% if post.platform == 'youtube' %}YouTube{% elif post.platform == 'facebook' %}Facebook{% else %}<span data-t>the original site</span>{% endif %}
     </a>
     {% endif %}
-    <button class="btn btn-glass js-share" type="button">{{ icon('share', 17) }} Share</button>
+    <button class="btn btn-glass js-share" type="button">{{ icon('share', 17) }} <span data-t>Share</span></button>
     {% if is_admin() %}<a class="btn btn-glass" href="{{ url_for('admin_post_form', post_id=post.id) }}">{{ icon('edit', 17) }} Edit</a>{% endif %}
   </div>
 
@@ -52,22 +52,22 @@
   {% if tags %}<ul class="tags">{% for tg in tags %}<li>#{{ tg }}</li>{% endfor %}</ul>{% endif %}
 
   <section class="comments" id="comments">
-    <h3>Comments <span class="count" data-comment-count>{{ comments|length }}</span></h3>
+    <h3><span data-t>Comments</span> <span class="count" data-comment-count>{{ comments|length }}</span></h3>
 
     <form class="comment-form js-comment-form" method="post" action="{{ url_for('add_comment', post_id=post.id) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="hp" aria-hidden="true"><label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
-      <input class="input" name="name" placeholder="Your name" maxlength="60" required autocomplete="name">
-      <textarea class="input" name="body" rows="3" maxlength="1000" placeholder="Write a comment…" required></textarea>
+      <input class="input" name="name" placeholder="Your name" data-t-ph maxlength="60" required autocomplete="name">
+      <textarea class="input" name="body" rows="3" maxlength="1000" placeholder="Write a comment…" data-t-ph required></textarea>
       <div class="form-row">
         <span class="form-msg" role="status"></span>
-        <button class="btn btn-primary" type="submit">{{ icon('chat', 17) }} Post comment</button>
+        <button class="btn btn-primary" type="submit">{{ icon('chat', 17) }} <span data-t>Post comment</span></button>
       </div>
     </form>
 
     <ul class="comment-list" data-comment-list>
       {% for c in comments %}{% include "_comment.html" %}{% endfor %}
     </ul>
-    <p class="muted empty-comments" {% if comments %}hidden{% endif %}>Be the first to comment.</p>
+    <p class="muted empty-comments" data-t {% if comments %}hidden{% endif %}>Be the first to comment.</p>
   </section>
 </article>

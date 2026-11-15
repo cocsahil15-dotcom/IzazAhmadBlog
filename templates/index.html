@@ -23,13 +23,13 @@
         {% endif %}
         {% if profile.bio %}<div class="bio">{{ profile.bio|paragraphs }}</div>{% endif %}
         {% if links %}
-        <div class="hero-social" aria-label="Social links">
+        <div class="hero-social" aria-label="Social links" data-t-label>
           {% for l in links[:6] %}<a data-p="{{ l.platform }}" href="{{ l.url }}" target="_blank" rel="noopener noreferrer" aria-label="{{ l.label }}">{{ icon(l.platform, 22) }}</a>{% endfor %}
         </div>
         {% endif %}
         <div class="hero-cta">
-          <a class="btn btn-primary" href="#videos">{{ icon('play', 18) }} Watch &amp; read</a>
-          {% if links %}<a class="btn btn-glass" href="#links">{{ icon('link', 18) }} Connect</a>{% endif %}
+          <a class="btn btn-primary" href="#videos">{{ icon('play', 18) }} <span data-t>Watch &amp; read</span></a>
+          {% if links %}<a class="btn btn-glass" href="#links">{{ icon('link', 18) }} <span data-t>Connect</span></a>{% endif %}
         </div>
       </div>
     </div>
@@ -40,21 +40,21 @@
   <!-- VIDEOS -->
   <section class="section reveal" id="videos" aria-labelledby="h-videos">
     <div class="section-head">
-      <p class="eyebrow">Library</p>
-      <h2 id="h-videos">Videos &amp; articles</h2>
-      <p class="hint">Tap any card to read what it is about — no need to watch the video.</p>
+      <p class="eyebrow" data-t>Library</p>
+      <h2 id="h-videos" data-t>Videos &amp; articles</h2>
+      <p class="hint" data-t>Tap any card to read what it is about — no need to watch the video.</p>
     </div>
 
     {% if posts %}
     <div class="toolbar">
       <label class="search glass-input">
         {{ icon('search', 18) }}
-        <input id="postSearch" type="search" placeholder="Search videos and topics" autocomplete="off" aria-label="Search videos and articles">
+        <input id="postSearch" type="search" placeholder="Search videos and topics" data-t-ph autocomplete="off" aria-label="Search videos and articles" data-t-label>
       </label>
-      <div class="chips" role="group" aria-label="Filter">
-        <button class="chip active" type="button" data-filter="all">All</button>
-        <button class="chip" type="button" data-filter="video">Videos</button>
-        <button class="chip" type="button" data-filter="article">Articles</button>
+      <div class="chips" role="group" aria-label="Filter" data-t-label>
+        <button class="chip active" type="button" data-filter="all" data-t>All</button>
+        <button class="chip" type="button" data-filter="video" data-t>Videos</button>
+        <button class="chip" type="button" data-filter="article" data-t>Articles</button>
       </div>
     </div>
 
@@ -66,24 +66,24 @@
         <div class="thumb">
           {% if t %}<img src="{{ t }}" alt="" loading="lazy" decoding="async" width="640" height="360">{% else %}<div class="thumb-fallback">{{ icon('play' if p.video_file else 'doc', 38) }}</div>{% endif %}
           {% if p.kind == 'video' %}<span class="thumb-play">{{ icon('play-solid', 20) }}</span>{% endif %}
-          <span class="thumb-tag">{{ 'Video' if p.kind == 'video' else 'Article' }}</span>
+          <span class="thumb-tag" data-t>{{ 'Video' if p.kind == 'video' else 'Article' }}</span>
         </div>
         <div class="card-body">
           <h3>{{ p.title }}</h3>
           {% if p.summary %}<p>{{ p.summary|truncate(120) }}</p>{% endif %}
           <div class="card-meta">
-            <span>{{ p.created_at|dt }}</span>
-            <span class="card-read">{{ icon('doc', 15) }} Quick read</span>
+            <span>{{ p.created_at|dtx }}</span>
+            <span class="card-read">{{ icon('doc', 15) }} <span data-t>Quick read</span></span>
             <span>{{ icon('chat', 15) }} {{ p.comment_count }}</span>
           </div>
         </div>
       </a>
       {% endfor %}
     </div>
-    <p class="empty-note" id="noMatch" hidden>Nothing matches your search.</p>
+    <p class="empty-note" id="noMatch" hidden data-t>Nothing matches your search.</p>
     {% else %}
     <div class="empty glass">
-      <p>No videos or articles yet.</p>
+      <p data-t>No videos or articles yet.</p>
       {% if is_admin() %}<a class="btn btn-primary" href="{{ url_for('admin_post_form') }}">{{ icon('plus', 18) }} Add the first one</a>{% endif %}
     </div>
     {% endif %}
@@ -92,8 +92,8 @@
   <!-- WORK -->
   <section class="section reveal" id="work" aria-labelledby="h-work">
     <div class="section-head">
-      <p class="eyebrow">Career</p>
-      <h2 id="h-work">Where he works</h2>
+      <p class="eyebrow" data-t>Career</p>
+      <h2 id="h-work" data-t>Where he works</h2>
     </div>
     {% if work %}
     <div class="work-grid">
@@ -105,7 +105,7 @@
           <p class="org">
             {% if w.url %}<a href="{{ w.url }}" target="_blank" rel="noopener noreferrer">{{ w.org }} {{ icon('external', 14) }}</a>{% else %}{{ w.org }}{% endif %}
           </p>
-          {% if w.start_year %}<p class="years">{{ w.start_year }} – {{ w.end_year or 'Present' }}</p>{% endif %}
+          {% if w.start_year %}<p class="years">{{ w.start_year }} – {% if w.end_year %}{{ w.end_year }}{% else %}<span data-t>Present</span>{% endif %}</p>{% endif %}
           {% if w.description %}<div class="work-desc">{{ w.description|paragraphs }}</div>{% endif %}
         </div>
       </article>
@@ -113,7 +113,7 @@
     </div>
     {% else %}
     <div class="empty glass">
-      <p>Work details will appear here.</p>
+      <p data-t>Work details will appear here.</p>
       {% if is_admin() %}<a class="btn btn-primary" href="{{ url_for('admin_work_form') }}">{{ icon('plus', 18) }} Add work</a>{% endif %}
     </div>
     {% endif %}
@@ -122,8 +122,8 @@
   <!-- CONNECT -->
   <section class="section reveal" id="links" aria-labelledby="h-links">
     <div class="section-head">
-      <p class="eyebrow">Follow</p>
-      <h2 id="h-links">Follow &amp; connect</h2>
+      <p class="eyebrow" data-t>Follow</p>
+      <h2 id="h-links" data-t>Follow &amp; connect</h2>
     </div>
     {% if links %}
     <div class="pass-grid">
@@ -140,7 +140,7 @@
     </div>
     {% else %}
     <div class="empty glass">
-      <p>No links yet.</p>
+      <p data-t>No links yet.</p>
       {% if is_admin() %}<a class="btn btn-primary" href="{{ url_for('admin_link_form') }}">{{ icon('plus', 18) }} Add a link</a>{% endif %}
     </div>
     {% endif %}
@@ -151,25 +151,25 @@
 {% block footer %}
 <footer class="footer">
   <p>© {{ year }} {{ profile.name }}</p>
-  <p><a href="{{ url_for('admin_login') }}">{{ icon('lock', 13) }} Admin</a></p>
+  <p><a href="{{ url_for('admin_login') }}">{{ icon('lock', 13) }} <span data-t>Admin</span></a></p>
 </footer>
 {% endblock %}
 
 {% block tabbar %}
-<nav class="tabbar" aria-label="Sections">
-  <a href="#home" data-tab="home" aria-current="true">{{ icon('home', 22) }}<span>Home</span></a>
-  <a href="#videos" data-tab="videos">{{ icon('play', 22) }}<span>Videos</span></a>
-  <a href="#work" data-tab="work">{{ icon('work', 22) }}<span>Work</span></a>
-  <a href="#links" data-tab="links">{{ icon('link', 22) }}<span>Connect</span></a>
+<nav class="tabbar" aria-label="Sections" data-t-label>
+  <a href="#home" data-tab="home" aria-current="true">{{ icon('home', 22) }}<span data-t>Home</span></a>
+  <a href="#videos" data-tab="videos">{{ icon('play', 22) }}<span data-t>Videos</span></a>
+  <a href="#work" data-tab="work">{{ icon('work', 22) }}<span data-t>Work</span></a>
+  <a href="#links" data-tab="links">{{ icon('link', 22) }}<span data-t>Connect</span></a>
 </nav>
 {% endblock %}
 
 {% block sheet %}
 <div class="sheet" id="sheet" aria-hidden="true">
   <div class="sheet-backdrop" data-close></div>
-  <div class="sheet-panel" id="sheetPanel" role="dialog" aria-modal="true" aria-label="Details" tabindex="-1">
+  <div class="sheet-panel" id="sheetPanel" role="dialog" aria-modal="true" aria-label="Details" data-t-label tabindex="-1">
     <div class="sheet-grab" id="sheetGrab" data-close><i></i></div>
-    <button class="sheet-close" type="button" data-close aria-label="Close">{{ icon('close', 20) }}</button>
+    <button class="sheet-close" type="button" data-close aria-label="Close" data-t-label>{{ icon('close', 20) }}</button>
     <div class="sheet-body" id="sheetBody"></div>
   </div>
 </div>

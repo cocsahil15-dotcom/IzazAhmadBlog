@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-tz="{{ tz_name }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -10,6 +10,7 @@
   <title>{% block title %}{{ profile.name }} · {{ profile.site_title }}{% endblock %}</title>
   {% block meta %}<meta name="description" content="{{ (profile.headline or profile.bio or profile.site_title)|truncate(155) }}">{% endblock %}
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=asset_v) }}">
+  <script src="{{ url_for('static', filename='js/i18n.js', v=asset_v) }}" defer></script>
   <script src="{{ url_for('static', filename='js/main.js', v=asset_v) }}" defer></script>
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
@@ -18,23 +19,33 @@
 
 {% block chrome %}
 <header class="topbar glass">
-  <a class="brand" href="{{ url_for('index') }}" aria-label="Home">
+  <a class="brand" href="{{ url_for('index') }}" aria-label="Home" data-t-label>
     <span class="avatar sm">{% if profile.avatar %}<img src="{{ media_url(profile.avatar) }}" alt="" width="34" height="34" decoding="async">{% else %}<span>{{ profile.name[:1]|upper }}</span>{% endif %}</span>
     <span class="brand-name">{{ profile.name }}</span>
   </a>
-  <nav class="topnav" aria-label="Sections">
-    <a href="{{ url_for('index') }}#videos">Videos</a>
-    <a href="{{ url_for('index') }}#work">Work</a>
-    <a href="{{ url_for('index') }}#links">Connect</a>
+  <nav class="topnav" aria-label="Sections" data-t-label>
+    <a href="{{ url_for('index') }}#videos" data-t>Videos</a>
+    <a href="{{ url_for('index') }}#work" data-t>Work</a>
+    <a href="{{ url_for('index') }}#links" data-t>Connect</a>
     {% if is_admin() %}<a class="pill-admin" href="{{ url_for('admin_dashboard') }}">Admin</a>{% endif %}
+    <button class="lang-btn" id="langBtn" type="button" aria-label="Switch language" data-t-label lang="bn">বাংলা</button>
   </nav>
 </header>
+
+<!-- live date, time and visitor count -->
+<div class="livebar" role="group" aria-label="Date, time and visitors" data-t-label>
+  <span class="live-item">{{ icon('calendar', 15) }}<span id="liveDate"></span></span>
+  <span class="live-item">{{ icon('clock', 15) }}<span id="liveTime" class="live-time"></span></span>
+  {% set vt = visitor_total() %}{% if vt is not none %}
+  <span class="live-item">{{ icon('users', 15) }}<span><span data-t>Visitors</span>:&nbsp;<b data-num="{{ vt }}">{{ '{:,}'.format(vt) }}</b></span></span>
+  {% endif %}
+</div>
 {% endblock %}
 
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
   <div class="flashes" role="status" aria-live="polite">
-    {% for cat, msg in messages %}<div class="flash flash-{{ cat }}">{{ msg }}</div>{% endfor %}
+    {% for cat, msg in messages %}<div class="flash flash-{{ cat }}" data-t>{{ msg }}</div>{% endfor %}
   </div>
   {% endif %}
 {% endwith %}

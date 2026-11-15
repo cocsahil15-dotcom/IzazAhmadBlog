@@ -1,11 +1,14 @@
 {% macro icon(name, size=22) -%}
+{%- if name == 'facebook' -%}
+{#- Facebook brand logo: blue disc (#1877F2) with the white "f". Brand colours, so no currentColor. -#}
+<svg class="ico ico-brand" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="12" fill="#1877F2"/><path fill="#fff" d="M16.67 15.47 17.2 12h-3.33V9.75c0-.95.47-1.88 1.96-1.88h1.51V4.92s-1.37-.23-2.68-.23c-2.74 0-4.53 1.66-4.53 4.67V12H7.05v3.47h3.08v8.33h3.74v-8.33z"/></svg>
+{%- else -%}
 <svg class="ico" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
 {%- if name == 'home' %}<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/>
 {%- elif name == 'work' %}<rect x="3" y="7" width="18" height="13" rx="3"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"/><path d="M3 12.5h18"/>
 {%- elif name == 'play' or name == 'youtube' %}<rect x="3" y="5" width="18" height="14" rx="4.5"/><path d="m10.5 9.5 4 2.5-4 2.5z" fill="currentColor"/>
 {%- elif name == 'play-solid' %}<path d="m8 5.5 11 6.5-11 6.5z" fill="currentColor" stroke="none"/>
 {%- elif name == 'link' or name == 'other' %}<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>
-{%- elif name == 'facebook' %}<path d="M14.5 21v-8h2.7l.5-3.3h-3.2V7.6c0-.9.4-1.6 1.7-1.6h1.6V3.2A19 19 0 0 0 15.4 3c-2.5 0-4.2 1.5-4.2 4.3v2.4H8.5V13h2.7v8"/>
 {%- elif name == 'instagram' %}<rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="3.8"/><circle cx="17" cy="7" r=".6" fill="currentColor"/>
 {%- elif name == 'tiktok' %}<path d="M14 4v10.2a3.7 3.7 0 1 1-3.7-3.7"/><path d="M14 4c.4 2.5 2 4 4.5 4.2"/>
 {%- elif name == 'x' %}<path d="M5 4.5 19 19.5M19 4.5 5 19.5"/>
@@ -35,6 +38,10 @@
 {%- elif name == 'download' %}<path d="M12 4v11"/><path d="m8 11 4 4 4-4"/><path d="M5 19.500h14"/>
 {%- elif name == 'upload' %}<path d="M12 15V4"/><path d="m8 8 4-4 4 4"/><path d="M5 19.500h14"/>
 {%- elif name == 'bot' %}<rect x="4" y="8" width="16" height="11" rx="4"/><path d="M12 8V4.500"/><circle cx="12" cy="4" r="1" fill="currentColor"/><circle cx="9" cy="13.500" r="1.200" fill="currentColor"/><circle cx="15" cy="13.500" r="1.200" fill="currentColor"/>
+{%- elif name == 'calendar' %}<rect x="3.500" y="5" width="17" height="15" rx="3"/><path d="M3.500 10h17M8 3.500V7M16 3.500V7"/>
+{%- elif name == 'clock' %}<circle cx="12" cy="12" r="8.500"/><path d="M12 7.500V12l3 2"/>
+{%- elif name == 'users' %}<circle cx="9" cy="8.500" r="3.300"/><path d="M3 19.500a6 6 0 0 1 12 0"/><path d="M16 5.600a3.300 3.300 0 0 1 0 5.800M18 14.200a6 6 0 0 1 3 5.300"/>
 {%- endif -%}
 </svg>
+{%- endif -%}
 {%- endmacro %}
