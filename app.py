@@ -23,8 +23,8 @@ import click
 import psycopg2
 from psycopg2 import extras, pool, sql
 from dotenv import load_dotenv
-from flask import (Flask, abort, after_this_request, flash, jsonify, redirect,
-                   render_template, request, send_file, send_from_directory,
+from flask import (Flask, abort, after_this_request, flash, jsonify, make_response,
+                   redirect, render_template, request, send_file, send_from_directory,
                    session, url_for)
 from markupsafe import Markup, escape
 from PIL import Image, ImageOps
@@ -92,6 +92,7 @@ try:
     DISPLAY_TZ = ZoneInfo(os.environ.get("TZ_NAME", "Asia/Dhaka")) if ZoneInfo else timezone.utc
 except Exception:  # unknown tz / tzdata missing
     DISPLAY_TZ = timezone.utc
+TZ_LABEL = getattr(DISPLAY_TZ, "key", "UTC")   # IANA name, e.g. Asia/Dhaka (used by the live clock)
 
 
 # ---------------------------------------------------------------------------
@@ -417,6 +418,24 @@ def _ago(v):
     return _dt(v)
 
 
+@app.template_filter("dtx")
+def _dtx(v, full=False):
+    """Date (optionally with time) as a <time> tag. The browser re-formats it in Bangla or English."""
+    if not v:
+        return ""
+    text = v.astimezone(DISPLAY_TZ).strftime("%d %b %Y, %H:%M" if full else "%d %b %Y")
+    return Markup('<time class="js-date" datetime="{}"{}>{}</time>').format(
+        v.isoformat(), Markup(' data-full="1"') if full else Markup(""), text)
+
+
+@app.template_filter("agotime")
+def _agotime(v):
+    """'5 min ago' as a <time> tag that the browser translates."""
+    if not v:
+        return ""
+    return Markup('<time class="js-ago" datetime="{}">{}</time>').format(v.isoformat(), _ago(v))
+
+
 @app.template_filter("paragraphs")
 def _paragraphs(text):
     parts = [p.strip() for p in re.split(r"\n\s*\n", text or "") if p.strip()]
@@ -439,6 +458,27 @@ def _hue(text):
     return sum(ord(c) for c in (text or "x")) * 37 % 360
 
 
+def visitor_total():
+    """Total visits so far, or None if the counter cannot be read."""
+    try:
+        row = query("SELECT visits FROM site_stats WHERE id=1", one=True)
+        return int(row["visits"]) if row else 0
+    except Exception:
+        return None
+
+
+_BOT_RE = re.compile(r"bot|crawl|spider|slurp|facebookexternalhit|preview|monitor|uptime|"
+                     r"curl|wget|python-requests|headless", re.I)
+
+
+def should_count_visit():
+    """Count a real person once per browser per 24 hours (not the owner, not robots)."""
+    if request.method != "GET" or is_admin() or request.cookies.get("v_seen"):
+        return False
+    ua = request.headers.get("User-Agent", "")
+    return bool(ua) and not _BOT_RE.search(ua)
+
+
 def csrf_token():
     if "_csrf" not in session:
         session["_csrf"] = secrets.token_urlsafe(32)
@@ -456,7 +496,7 @@ def inject():
                    "location": "", "email": "", "avatar": None, "cover": None}
     return dict(profile=profile, csrf_token=csrf_token, is_admin=is_admin,
                 media_url=media_url, thumb_url=thumb_url, embed_url=embed_url,
-                video_src=video_src,
+                video_src=video_src, visitor_total=visitor_total, tz_name=TZ_LABEL,
                 year=datetime.now(DISPLAY_TZ).year, asset_v=ASSET_V)
 
 
@@ -533,7 +573,18 @@ def index():
         bot = query("SELECT * FROM bot_settings WHERE id=1", one=True)
     except Exception:
         bot = None
-    return render_template("index.html", links=links, work=work, posts=posts, bot=bot)
+    counted = False
+    if should_count_visit():
+        try:
+            execute("UPDATE site_stats SET visits = visits + 1, updated_at = now() WHERE id=1")
+            counted = True
+        except Exception as exc:
+            print(f"WARNING: could not count the visit: {exc}")
+    resp = make_response(render_template("index.html", links=links, work=work, posts=posts, bot=bot))
+    if counted:
+        resp.set_cookie("v_seen", "1", max_age=24 * 3600, httponly=True, samesite="Lax",
+                        secure=app.config["SESSION_COOKIE_SECURE"])
+    return resp
 
 
 @app.route("/post/<slug>")
@@ -966,7 +1017,7 @@ def admin_delete_comment(comment_id):
 #   * if the database is ever empty on start-up, the newest snapshot is restored by itself
 # ---------------------------------------------------------------------------
 BACKUP_TABLES = ["admin_users", "profile", "social_links", "workplaces", "posts",
-                 "comments", "bot_settings"]
+                 "comments", "bot_settings", "site_stats"]
 BACKUP_FORMAT = 1
 BACKUP_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.zip$")
 _backup_lock = threading.Lock()
@@ -1012,12 +1063,20 @@ def uploads_size():
     return total, count
 
 
+def _content_hash(data):
+    """Hash of everything except the visitor counter (which changes on every visit)."""
+    body = {k: v for k, v in data.items() if k != "site_stats"}
+    return hashlib.sha256(json.dumps(body, default=_json_default,
+                                     ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
 def write_backup_zip(dest, data, include_media):
     payload = json.dumps(data, default=_json_default, ensure_ascii=False).encode("utf-8")
     manifest = {"app": "cousin-site", "format": BACKUP_FORMAT,
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "includes_media": bool(include_media),
                 "data_sha256": hashlib.sha256(payload).hexdigest(),
+                "content_sha256": _content_hash(data),
                 "counts": {t: len(rows) for t, rows in data.items()}}
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
         zf.writestr("manifest.json", json.dumps(manifest, indent=2))
@@ -1116,13 +1175,15 @@ def auto_backup_if_due():
             if autos:
                 try:
                     with zipfile.ZipFile(os.path.join(BACKUP_DIR, autos[0]["name"])) as zf:
-                        last = json.loads(zf.read("manifest.json")).get("data_sha256")
+                        last = json.loads(zf.read("manifest.json")).get("content_sha256")
                 except Exception:
                     last = None
-                fresh = hashlib.sha256(json.dumps(
-                    data, default=_json_default, ensure_ascii=False).encode("utf-8")).hexdigest()
-                if last == fresh:      # nothing changed since the last snapshot
-                    os.utime(os.path.join(BACKUP_DIR, autos[0]["name"]))
+                if last == _content_hash(data):
+                    # Only the visitor counter moved: refresh the newest snapshot in place
+                    # instead of using up one of the snapshot slots.
+                    keep = os.path.join(BACKUP_DIR, autos[0]["name"])
+                    write_backup_zip(keep + ".part", data, False)
+                    os.replace(keep + ".part", keep)
                     conn.rollback()
                     return None
             write_backup_zip(final + ".part", data, False)
@@ -1231,6 +1292,7 @@ def restore_from_zip(path, cur):
                             .format(sql.Identifier(t)), (seq,))
         cur.execute("INSERT INTO profile (id) VALUES (1) ON CONFLICT (id) DO NOTHING")
         cur.execute("INSERT INTO bot_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING")
+        cur.execute("INSERT INTO site_stats (id) VALUES (1) ON CONFLICT (id) DO NOTHING")
 
     summary = (f"{counts.get('posts', 0)} videos/posts, {counts.get('comments', 0)} comments, "
                f"{counts.get('workplaces', 0)} work places, {counts.get('social_links', 0)} links, "

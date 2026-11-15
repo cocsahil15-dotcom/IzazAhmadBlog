@@ -87,3 +87,11 @@ CREATE TABLE IF NOT EXISTS bot_settings (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 INSERT INTO bot_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+-- Visitor counter (single row, id = 1). One visit is counted per browser per 24 hours.
+CREATE TABLE IF NOT EXISTS site_stats (
+    id         INT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    visits     BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+INSERT INTO site_stats (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
