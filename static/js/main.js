@@ -3,6 +3,7 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const csrf = () => ($('meta[name="csrf-token"]') || {}).content || '';
+  const T = s => (window.i18n ? window.i18n.t(s) : s);          /* Bangla / English (i18n.js) */
 
   /* ---- toasts: fade out after a few seconds ---- */
   $$('.flash').forEach(el => {
@@ -93,7 +94,7 @@
     };
 
     const openPost = async (url, push) => {
-      body.innerHTML = '<div class="sheet-loading">Loading…</div>';
+      body.innerHTML = '<div class="sheet-loading">' + T('Loading…') + '</div>';
       body.scrollTop = 0;
       show();
       try {
@@ -226,7 +227,7 @@
   const bot = $('#shadhin');
   if (bot) {
     const panel = $('#shPanel'), fab = $('#shFab'), teaser = $('#shTeaser'), log = $('#shLog');
-    const lines = $$('#shMsgs li').map(li => li.textContent.trim()).filter(Boolean);
+    const getLines = () => $$('#shMsgs li').map(li => li.textContent.trim()).filter(Boolean);
     const store = { get: k => { try { return sessionStorage.getItem(k); } catch (_) { return null; } },
                     set: (k, v) => { try { sessionStorage.setItem(k, v); } catch (_) {} } };
     const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -238,6 +239,7 @@
       log.appendChild(d); log.scrollTop = log.scrollHeight; return d;
     };
     const play = async () => {
+      const lines = getLines();
       if (played || !lines.length) return;
       played = true;
       for (const t of lines) {
@@ -265,17 +267,17 @@
     $$('.sh-chip', bot).forEach(ch => ch.addEventListener('click', async e => {
       e.preventDefault();
       bubble(ch.textContent.trim(), 'me');
-      await wait(350); bubble(ch.dataset.reply || 'Here you go 👇', 'bot');
+      await wait(350); bubble(T(ch.dataset.reply || 'Here you go 👇'), 'bot');
       await wait(700); setOpen(false);
       const target = document.querySelector(ch.getAttribute('href'));
       if (target) target.scrollIntoView({ behavior: 'smooth' });
     }));
 
     /* pop up with the greeting once per visit */
-    if (lines.length && !store.get('shadhin-seen')) {
+    if (getLines().length && !store.get('shadhin-seen')) {
       setTimeout(() => {
         if (open) return;
-        teaser.textContent = lines[0]; teaser.hidden = false; fab.classList.add('wiggle');
+        teaser.textContent = getLines()[0]; teaser.hidden = false; fab.classList.add('wiggle');
         setTimeout(() => { teaser.hidden = true; }, 10000);
       }, 1500);
     }
@@ -308,7 +310,7 @@
       if (navigator.share) { try { await navigator.share({ title, url }); } catch (_) {} return; }
       try {
         await navigator.clipboard.writeText(url);
-        const old = share.innerHTML; share.textContent = 'Link copied ✓';
+        const old = share.innerHTML; share.textContent = T('Link copied ✓');
         setTimeout(() => { share.innerHTML = old; }, 1800);
       } catch (_) { window.prompt('Copy this link:', url); }
       return;
@@ -353,7 +355,7 @@
     const btn = $('button[type=submit]', form);
     const msg = $('.form-msg', form);
     const art = form.closest('.post');
-    btn.disabled = true; msg.className = 'form-msg'; msg.textContent = 'Posting…';
+    btn.disabled = true; msg.className = 'form-msg'; msg.textContent = T('Posting…');
     try {
       const res = await fetch(form.action, { method: 'POST', body: new FormData(form), headers: { 'X-Requested-With': 'fetch' } });
       let data = {};
@@ -365,9 +367,9 @@
         const empty = $('.empty-comments', art); if (empty) empty.hidden = true;
       }
       form.reset();
-      msg.classList.add('ok'); msg.textContent = 'Posted ✓';
+      msg.classList.add('ok'); msg.textContent = T('Posted ✓');
     } catch (err) {
-      msg.classList.add('err'); msg.textContent = err.message;
+      msg.classList.add('err'); msg.textContent = T(err.message);
     } finally {
       btn.disabled = false;
     }
