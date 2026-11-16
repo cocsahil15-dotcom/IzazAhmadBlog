@@ -4,6 +4,8 @@ Public site  : /
 Admin panel  : /admin
 """
 import hashlib
+import html as html_lib
+import io
 import json
 import os
 import re
@@ -12,6 +14,8 @@ import shutil
 import tempfile
 import threading
 import time
+import urllib.error
+import urllib.request
 import uuid
 import zipfile
 from contextlib import contextmanager
@@ -294,6 +298,97 @@ def save_image(file_storage, max_side=1600):
         return name
     except Exception:
         raise ValueError("That file is not a valid image. Please upload a JPG, PNG, WEBP or GIF.")
+
+
+def save_image_bytes(data, max_side=1280, crop_169=False):
+    """Shrink image bytes (downloaded from a link) and store as .webp. Returns filename or None."""
+    try:
+        img = Image.open(io.BytesIO(data))
+        img.load()
+        img = ImageOps.exif_transpose(img)
+        if crop_169:                      # YouTube's hqdefault has black bars: cut to 16:9
+            w, h = img.size
+            nh = round(w * 9 / 16)
+            if h and abs(w / h - 16 / 9) > 0.05 and nh < h:
+                top = (h - nh) // 2
+                img = img.crop((0, top, w, top + nh))
+        img.thumbnail((max_side, max_side))
+        img = img.convert("RGBA" if "A" in img.getbands() else "RGB")
+        name = uuid.uuid4().hex + ".webp"
+        img.save(os.path.join(UPLOAD_DIR, name), "WEBP", quality=85)
+        return name
+    except Exception:
+        return None
+
+
+# ---- automatic cover picture from a YouTube / Facebook link ----------------------------
+# The server only talks to these sites (so a link can never make it call anything else).
+THUMB_HOSTS = ("youtube.com", "youtu.be", "ytimg.com", "facebook.com", "fb.com", "fb.watch",
+               "fbcdn.net", "fbsbx.com")
+FB_CRAWLER_UA = "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"
+_META_RE = re.compile(r"<meta\b[^>]*>", re.I)
+_ATTR_RE = re.compile(r"""([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')""")
+
+
+def _host_allowed(url):
+    h = _host(url)
+    return url.lower().startswith("https://") and any(h == d or h.endswith("." + d) for d in THUMB_HOSTS)
+
+
+class _SameSitesOnly(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not _host_allowed(newurl):
+            raise urllib.error.URLError("redirect to a site that is not allowed")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _http_get(url, max_bytes, accept="*/*", ua=None):
+    if not _host_allowed(url):
+        raise ValueError("site not allowed")
+    req = urllib.request.Request(url, headers={
+        "User-Agent": ua or "Mozilla/5.0 (compatible; SiteThumbnailBot/1.0)",
+        "Accept": accept, "Accept-Language": "en-US,en;q=0.9"})
+    with urllib.request.build_opener(_SameSitesOnly).open(req, timeout=8) as r:
+        data = r.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise ValueError("too large")
+    return data
+
+
+def og_image(page):
+    """The picture a page offers for link previews (og:image), or None."""
+    for tag in _META_RE.findall(page):
+        attrs = {m.group(1).lower(): html_lib.unescape(m.group(2) if m.group(2) is not None else m.group(3))
+                 for m in _ATTR_RE.finditer(tag)}
+        key = (attrs.get("property") or attrs.get("name") or "").lower()
+        if key in ("og:image", "og:image:secure_url", "twitter:image") and attrs.get("content"):
+            return attrs["content"]
+    return None
+
+
+def fetch_thumbnail(video_url):
+    """Download the cover picture of a YouTube / Facebook video. Returns a stored filename or None."""
+    candidates = []                                   # (image url, crop to 16:9?)
+    yid = youtube_id(video_url)
+    if yid:
+        candidates = [(f"https://i.ytimg.com/vi/{yid}/maxresdefault.jpg", False),
+                      (f"https://i.ytimg.com/vi/{yid}/hqdefault.jpg", True)]
+    elif is_facebook(video_url):
+        try:
+            page = _http_get(video_url, 2_000_000, "text/html", FB_CRAWLER_UA).decode("utf-8", "ignore")
+            img = og_image(page)
+            if img:
+                candidates = [(img, False)]
+        except Exception as exc:
+            print(f"Facebook thumbnail lookup failed: {exc}")
+    for url, crop in candidates:
+        try:
+            name = save_image_bytes(_http_get(url, MAX_IMAGE_BYTES, "image/*"), 1280, crop)
+            if name:
+                return name
+        except Exception as exc:
+            print(f"Thumbnail download failed ({url[:60]}): {exc}")
+    return None
 
 
 VIDEO_EXTS = {".mp4", ".m4v", ".mov", ".webm", ".ogv"}
@@ -934,26 +1029,46 @@ def admin_post_form(post_id=None):
             points = clean(f.get("key_points"), 3000, True)
             tags = clean(f.get("tags"), 200)
             published = bool(f.get("published"))
+            # Cover picture: one you upload always wins; otherwise it is taken from the
+            # YouTube / Facebook link (when the post is new, the link changed, the picture was
+            # removed, or "get it again" is ticked).
+            cur_thumb = item["thumb"] if item else None
+            cur_auto = bool(item and item.get("thumb_auto"))
+            if thumb:
+                new_thumb, new_auto = thumb, False
+            elif f.get("remove_thumb"):
+                new_thumb, new_auto = None, False
+            else:
+                new_thumb, new_auto = cur_thumb, cur_auto
+            thumb_note = ""
+            if video_url and not thumb and (
+                    not new_thumb or f.get("refetch_thumb")
+                    or (new_auto and video_url != (item["video_url"] if item else ""))):
+                got = fetch_thumbnail(video_url)
+                if got:
+                    new_thumb, new_auto = got, True
+                    thumb_note = " The cover picture was taken from the video link."
+                elif not new_thumb and platform == "facebook":
+                    thumb_note = (" Facebook did not give a picture for this link - "
+                                  "you can upload one yourself.")
+            if new_thumb != cur_thumb:
+                delete_media(cur_thumb)
             if item:
-                new_thumb = item["thumb"]
-                if thumb or f.get("remove_thumb"):
-                    delete_media(item["thumb"])
-                    new_thumb = thumb
                 execute("""UPDATE posts SET title=%s, kind=%s, platform=%s, video_url=%s, thumb=%s,
-                           video_file=%s, summary=%s, description=%s, key_points=%s, tags=%s,
-                           published=%s, updated_at=now() WHERE id=%s""",
-                        (title, kind, platform, video_url, new_thumb, final_video, summary, desc,
-                         points, tags, published, post_id))
+                           thumb_auto=%s, video_file=%s, summary=%s, description=%s, key_points=%s,
+                           tags=%s, published=%s, updated_at=now() WHERE id=%s""",
+                        (title, kind, platform, video_url, new_thumb, new_auto, final_video, summary,
+                         desc, points, tags, published, post_id))
                 if final_video != old_video:
                     delete_media(old_video)
             else:
-                execute("""INSERT INTO posts (slug, title, kind, platform, video_url, thumb, video_file,
-                           summary, description, key_points, tags, published)
-                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                        (make_slug(title), title, kind, platform, video_url, thumb, final_video,
-                         summary, desc, points, tags, published))
-            flash("Saved." if item else "Published! It is now on your site." if published
-                  else "Saved as a draft.", "ok")
+                execute("""INSERT INTO posts (slug, title, kind, platform, video_url, thumb, thumb_auto,
+                           video_file, summary, description, key_points, tags, published)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                        (make_slug(title), title, kind, platform, video_url, new_thumb, new_auto,
+                         final_video, summary, desc, points, tags, published))
+            flash(("Saved." if item else "Published! It is now on your site." if published
+                   else "Saved as a draft.") + thumb_note, "ok")
             if wants_json():
                 return jsonify(ok=True, redirect=url_for("admin_posts"))
             return redirect(url_for("admin_posts"))

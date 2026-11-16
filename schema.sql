@@ -95,3 +95,6 @@ CREATE TABLE IF NOT EXISTS site_stats (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 INSERT INTO site_stats (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+-- true when the cover picture was taken from the YouTube / Facebook link (not uploaded by hand)
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS thumb_auto BOOLEAN NOT NULL DEFAULT FALSE;
