@@ -33,10 +33,11 @@
     <small>YouTube or Facebook link. Leave this and the upload empty to publish a written article.</small></label>
 
   <div class="field"><span>Cover picture <em>(optional)</em></span>
-    {% if item and item.thumb %}<img class="preview" id="thumbPrev" src="{{ media_url(item.thumb) }}" alt="">{% else %}<img class="preview" id="thumbPrev" alt="" hidden>{% endif %}
+    {% if item and item.thumb %}<img class="preview" id="thumbPrev" src="{{ media_url(item.thumb) }}" alt="" {% if not item.thumb_auto %}data-manual="1"{% endif %}>{% else %}<img class="preview" id="thumbPrev" alt="" hidden>{% endif %}
     <input class="input file" type="file" name="thumb" accept="image/*" data-preview="thumbPrev">
-    <small>YouTube videos use their own thumbnail automatically if you leave this empty.</small>
-    {% if item and item.thumb %}<label class="check"><input type="checkbox" name="remove_thumb" value="1"> Remove current picture</label>{% endif %}
+    <small>Leave this empty and the picture is taken from the YouTube or Facebook link when you save. Choose a picture here to use your own instead.</small>
+    {% if item and item.video_url %}<label class="check"><input type="checkbox" name="refetch_thumb" value="1"> Get the picture from the video link again</label>{% endif %}
+    {% if item and item.thumb %}<label class="check"><input type="checkbox" name="remove_thumb" value="1"> Remove current picture <small>(a new one is taken from the link, if there is one)</small></label>{% endif %}
   </div>
 
   <label class="field"><span>Short summary</span>
