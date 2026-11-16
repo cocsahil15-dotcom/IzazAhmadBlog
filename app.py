@@ -253,6 +253,22 @@ def detect_platform(url):
     return "other"
 
 
+_FB_POST_HINTS = ("/posts/", "/permalink", "story.php", "/photo", "/share/p/", "/notes/")
+
+
+def guess_kind(url, has_file=False):
+    """'video' or 'article' when the owner leaves the choice on Automatic."""
+    if has_file:
+        return "video"
+    if not url:
+        return "article"
+    if youtube_id(url):
+        return "video"
+    if is_facebook(url):          # Facebook text posts / photos are not videos
+        return "article" if any(h in url.lower() for h in _FB_POST_HINTS) else "video"
+    return "article"              # a link to any other website is an article
+
+
 def embed_url(post):
     url = post["video_url"] if post else ""
     if not url:
@@ -1022,7 +1038,8 @@ def admin_post_form(post_id=None):
             final_video = old_video
             if new_video or f.get("remove_video"):
                 final_video = new_video
-            kind = "video" if (video_url or final_video) else "article"
+            chosen = f.get("kind")
+            kind = chosen if chosen in ("video", "article") else guess_kind(video_url, final_video)
             platform = detect_platform(video_url) if video_url else ("upload" if final_video else "other")
             summary = clean(f.get("summary"), 400, True)
             desc = clean(f.get("description"), 20000, True)
