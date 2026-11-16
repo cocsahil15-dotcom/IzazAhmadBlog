@@ -10,7 +10,9 @@
   <div class="two">
     <div class="field"><span>Profile picture</span>
       {% if profile.avatar %}<img class="preview round" id="avPrev" src="{{ media_url(profile.avatar) }}" alt="">{% else %}<img class="preview round" id="avPrev" alt="" hidden>{% endif %}
-      <input class="input file" type="file" name="avatar" accept="image/*" data-preview="avPrev">
+      <input class="input file" id="avatarInput" type="file" name="avatar" accept="image/*" data-preview="avPrev" data-crop>
+      {% if profile.avatar %}<button class="btn btn-glass btn-sm" type="button" data-crop-existing="avatarInput" data-src="{{ media_url(profile.avatar) }}">{{ icon('eye', 16) }} Adjust current picture</button>{% endif %}
+      <small>After choosing a photo you can move and zoom it to fit the circle.</small>
       {% if profile.avatar %}<label class="check"><input type="checkbox" name="remove_avatar" value="1"> Remove picture</label>{% endif %}
     </div>
     <div class="field"><span>Cover picture <em>(wide banner)</em></span>
@@ -34,4 +36,5 @@
     <a class="btn btn-glass" href="{{ url_for('admin_password') }}">{{ icon('lock', 18) }} Change password</a>
   </div>
 </form>
+<script src="{{ url_for('static', filename='js/cropper.js', v=asset_v) }}" defer></script>
 {% endblock %}
