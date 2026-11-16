@@ -223,6 +223,20 @@
     });
   }
 
+  /* ---- admin: show the YouTube cover as soon as a link is pasted ---- */
+  const linkIn = $('input[name=video_url]');
+  const coverImg = $('#thumbPrev');
+  if (linkIn && coverImg) {
+    const yt = /(?:youtube\.com\/(?:watch\?(?:[^#]*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/;
+    const coverFile = $('input[name=thumb]');
+    linkIn.addEventListener('input', () => {
+      const m = yt.exec(linkIn.value);
+      if (!m || coverImg.dataset.manual === '1' || (coverFile && coverFile.files && coverFile.files.length)) return;
+      coverImg.src = 'https://i.ytimg.com/vi/' + m[1] + '/hqdefault.jpg';
+      coverImg.hidden = false;
+    });
+  }
+
   /* ---- Shadhin, the welcome bot ---- */
   const bot = $('#shadhin');
   if (bot) {
