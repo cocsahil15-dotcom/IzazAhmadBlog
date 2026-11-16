@@ -1,9 +1,12 @@
-/* Profile picture crop + zoom. Pick a photo, drag to move, slide/scroll/pinch to zoom,
-   then "Use photo". The cropped square replaces the file in the form. No libraries. */
+/* Picture crop + zoom for the admin Profile page (profile picture and cover banner).
+   Pick a photo, drag to move, slide/scroll/pinch to zoom, then "Use photo".
+   The cropped image replaces the file in the form. No libraries. */
 (() => {
   'use strict';
-  const OUT = 800;            // exported size in px
-  const BOX = 280;            // on-screen crop circle size
+  const MODES = {
+    avatar: { title: 'Adjust profile picture', w: 280, h: 280, outW: 800,  outH: 800,  round: true,  name: 'avatar.jpg' },
+    cover:  { title: 'Adjust cover picture',   w: 320, h: 180, outW: 1600, outH: 900,  round: false, name: 'cover.jpg'  }
+  };
   const inputs = Array.from(document.querySelectorAll('input[type=file][data-crop]'));
   if (!inputs.length) return;
 
@@ -12,11 +15,11 @@
   dlg.className = 'crop-dlg glass';
   dlg.innerHTML = `
     <form method="dialog" class="crop-form">
-      <h2>Adjust profile picture</h2>
+      <h2 id="cropTitle">Adjust picture</h2>
       <p class="muted">Drag to move. Use the slider or scroll to zoom.</p>
-      <div class="crop-stage" id="cropStage" style="width:${BOX}px;height:${BOX}px">
+      <div class="crop-stage" id="cropStage">
         <img id="cropImg" alt="" draggable="false">
-        <div class="crop-ring"></div>
+        <div class="crop-ring" id="cropRing"></div>
       </div>
       <input id="cropZoom" class="crop-zoom" type="range" min="1" max="4" step="0.01" value="1" aria-label="Zoom">
       <div class="form-actions">
@@ -26,17 +29,20 @@
     </form>`;
   document.body.appendChild(dlg);
   const stage = dlg.querySelector('#cropStage');
+  const ring = dlg.querySelector('#cropRing');
   const img = dlg.querySelector('#cropImg');
   const zoom = dlg.querySelector('#cropZoom');
+  const title = dlg.querySelector('#cropTitle');
 
-  let cur = null;                 // the file input being edited
-  let nw = 0, nh = 0;             // natural image size
-  let base = 1;                   // scale that just covers the box
-  let z = 1, x = 0, y = 0;        // zoom, offset of image centre from box centre (screen px)
+  let cur = null, mode = MODES.avatar;
+  let BW = 280, BH = 280;          // crop box size on screen
+  let nw = 0, nh = 0;              // natural image size
+  let base = 1;                    // scale that just covers the box
+  let z = 1, x = 0, y = 0;         // zoom, offset of image centre from box centre (screen px)
 
   const clamp = () => {
     const w = nw * base * z, h = nh * base * z;
-    const mx = Math.max(0, (w - BOX) / 2), my = Math.max(0, (h - BOX) / 2);
+    const mx = Math.max(0, (w - BW) / 2), my = Math.max(0, (h - BH) / 2);
     x = Math.min(mx, Math.max(-mx, x));
     y = Math.min(my, Math.max(-my, y));
   };
@@ -45,19 +51,25 @@
     const w = nw * base * z, h = nh * base * z;
     img.style.width = w + 'px';
     img.style.height = h + 'px';
-    img.style.transform = `translate(${(BOX - w) / 2 + x}px, ${(BOX - h) / 2 + y}px)`;
+    img.style.transform = `translate(${(BW - w) / 2 + x}px, ${(BH - h) / 2 + y}px)`;
   };
   const setZoom = (nz) => {
     const k = nz / z;
-    x *= k; y *= k;             // keep the centre point steady while zooming
+    x *= k; y *= k;                // keep the centre point steady while zooming
     z = nz; zoom.value = String(nz); paint();
   };
 
   const open = (src, input, revoke) => {
     cur = input;
+    mode = MODES[input.dataset.crop] || MODES.avatar;
+    BW = mode.w; BH = mode.h;
+    stage.style.width = BW + 'px'; stage.style.height = BH + 'px';
+    stage.style.borderRadius = mode.round ? '22px' : '16px';
+    ring.className = 'crop-ring' + (mode.round ? '' : ' rect');
+    title.textContent = mode.title;
     img.onload = () => {
       nw = img.naturalWidth; nh = img.naturalHeight;
-      base = BOX / Math.min(nw, nh);
+      base = Math.max(BW / nw, BH / nh);
       z = 1; x = y = 0; zoom.value = '1'; paint();
       if (!dlg.open) dlg.showModal();
       if (revoke) URL.revokeObjectURL(src);
@@ -122,24 +134,24 @@
   dlg.querySelector('#cropOk').addEventListener('click', () => {
     if (!cur) return;
     const scale = base * z;                       // screen px per source px
-    const sw = BOX / scale;                       // source square size
+    const sw = BW / scale, sh = BH / scale;       // source rectangle
     const sx = nw / 2 - (x / scale) - sw / 2;
-    const sy = nh / 2 - (y / scale) - sw / 2;
+    const sy = nh / 2 - (y / scale) - sh / 2;
     const c = document.createElement('canvas');
-    c.width = c.height = OUT;
+    c.width = mode.outW; c.height = mode.outH;
     const g = c.getContext('2d');
     g.imageSmoothingQuality = 'high';
-    g.fillStyle = '#fff'; g.fillRect(0, 0, OUT, OUT);
-    g.drawImage(img, sx, sy, sw, sw, 0, 0, OUT, OUT);
-    const input = cur;
+    g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    const input = cur, m = mode;
     c.toBlob(blob => {
       if (!blob) return;
-      const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
+      const file = new File([blob], m.name, { type: 'image/jpeg' });
       const dt = new DataTransfer(); dt.items.add(file);
       input.files = dt.files;
       const prev = document.getElementById(input.dataset.preview);
       if (prev) { prev.src = URL.createObjectURL(blob); prev.hidden = false; }
-      const rm = input.form && input.form.querySelector('input[name=remove_avatar]');
+      const rm = input.form && input.form.querySelector(`input[name=remove_${input.name}]`);
       if (rm) rm.checked = false;
       delete input.dataset.fromPick;
       close();
@@ -157,7 +169,7 @@
     }, true);
   });
 
-  /* "Adjust current picture" button re-opens the saved image for re-cropping */
+  /* "Adjust current picture" buttons re-open the saved image for re-cropping */
   document.querySelectorAll('[data-crop-existing]').forEach(btn => {
     btn.addEventListener('click', () => {
       const inp = document.getElementById(btn.dataset.cropExisting);
