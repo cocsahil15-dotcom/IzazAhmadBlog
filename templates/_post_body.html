@@ -1,6 +1,6 @@
 {% from "_icons.html" import icon %}
 {% set vsrc = video_src(post) %}
-{% set embed = embed_url(post) if not vsrc else None %}
+{% set embed = embed_url(post) if (not vsrc and post.kind == 'video') else None %}
 {% set t = thumb_url(post) %}
 <article class="post" data-post-id="{{ post.id }}" data-title="{{ post.title }}" data-url="{{ url_for('post_view', slug=post.slug) }}">
 
