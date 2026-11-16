@@ -32,6 +32,13 @@
            value="{{ item.video_url if item else '' }}">
     <small>YouTube or Facebook link. Leave this and the upload empty to publish a written article.</small></label>
 
+  {% set cur_kind = item.kind if item and item.kind in ('video', 'article') else 'auto' %}
+  <div class="field"><span>Show this post as</span>
+    <label class="check"><input type="radio" name="kind" value="auto" {% if cur_kind == 'auto' %}checked{% endif %}> Automatic <small>(video links and uploaded videos = video; text and other links = article)</small></label>
+    <label class="check"><input type="radio" name="kind" value="video" {% if cur_kind == 'video' %}checked{% endif %}> Video</label>
+    <label class="check"><input type="radio" name="kind" value="article" {% if cur_kind == 'article' %}checked{% endif %}> Article <small>(no play button; the link, if any, opens as "original site")</small></label>
+  </div>
+
   <div class="field"><span>Cover picture <em>(optional)</em></span>
     {% if item and item.thumb %}<img class="preview" id="thumbPrev" src="{{ media_url(item.thumb) }}" alt="" {% if not item.thumb_auto %}data-manual="1"{% endif %}>{% else %}<img class="preview" id="thumbPrev" alt="" hidden>{% endif %}
     <input class="input file" type="file" name="thumb" accept="image/*" data-preview="thumbPrev">
