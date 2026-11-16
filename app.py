@@ -295,7 +295,7 @@ def thumb_url(post):
     return None
 
 
-def save_image(file_storage, max_side=1600):
+def save_image(file_storage, max_side=1600, square=False):
     """Validate + shrink an uploaded image, store as .webp. Returns filename or None."""
     if not file_storage or not file_storage.filename:
         return None
@@ -307,6 +307,8 @@ def save_image(file_storage, max_side=1600):
     try:
         img = Image.open(file_storage.stream)
         img = ImageOps.exif_transpose(img)
+        if square:                        # safety net: centre-crop to a square
+            img = ImageOps.fit(img, (min(max_side, min(img.size)),) * 2, Image.LANCZOS)
         img.thumbnail((max_side, max_side))
         img = img.convert("RGBA" if "A" in img.getbands() else "RGB")
         name = uuid.uuid4().hex + ".webp"
@@ -842,7 +844,7 @@ def admin_profile():
             flash("That email address does not look right.", "err")
             return render_template("admin/profile.html", form=f)
         try:
-            avatar = save_image(request.files.get("avatar"), 800)
+            avatar = save_image(request.files.get("avatar"), 800, square=True)
             cover = save_image(request.files.get("cover"), 1800)
         except ValueError as e:
             flash(str(e), "err")
