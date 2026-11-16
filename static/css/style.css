@@ -567,3 +567,17 @@ html[lang="bn"] .tabbar a { font-size: 12px; }
 /* real Facebook logo: blue disc with the white "f" on a white tile */
 .ico-brand { border-radius: 50%; }
 .hero-social a[data-p="facebook"], .pass[data-p="facebook"] .pass-ico { background: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.6); }
+
+/* ---------- Profile picture cropper (admin) ---------- */
+.crop-dlg { border: 1px solid rgba(255,255,255,.25); border-radius: 26px; padding: 22px; color: var(--ink, #fff);
+  width: min(360px, calc(100vw - 24px)); background: rgba(24,28,40,.92); }
+.crop-dlg::backdrop { background: rgba(0,0,0,.6); backdrop-filter: blur(4px); }
+.crop-form { display: grid; gap: 14px; justify-items: center; text-align: center; }
+.crop-form h2 { font-size: 20px; letter-spacing: -.01em; }
+.crop-stage { position: relative; overflow: hidden; border-radius: 22px; background: #000; touch-action: none; cursor: grab; user-select: none; }
+.crop-stage:active { cursor: grabbing; }
+.crop-stage img { position: absolute; left: 0; top: 0; max-width: none; transform-origin: 0 0; pointer-events: none; }
+.crop-ring { position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  box-shadow: 0 0 0 999px rgba(0,0,0,.55), inset 0 0 0 2px rgba(255,255,255,.85); }
+.crop-zoom { width: 100%; accent-color: var(--blue, #0a84ff); }
+.crop-form .form-actions { justify-content: center; }
